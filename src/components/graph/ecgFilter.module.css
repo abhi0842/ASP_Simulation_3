@@ -1,0 +1,95 @@
+.signalContainer {
+    width: 100%;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    margin-bottom: 20px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.explanationPanel {
+    background: #fff;
+    padding: 16px;
+    border-radius: 12px;
+    border-left: 5px solid #0078d4;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.explanationPanel h4 {
+    margin: 0 0 8px 0;
+    color: #0078d4;
+    font-size: 1rem;
+}
+
+.explanationPanel p {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #333;
+    font-weight: 500;
+}
+
+.detectionBadge {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 4px 12px;
+    background: #ffd400;
+    color: #000;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.graphGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.graphWrapper {
+    background: #fff;
+    padding: 12px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    height: 260px;
+    display: flex;
+    flex-direction: column;
+}
+
+.graphWrapper h5 {
+    margin: 0 0 10px 0;
+    font-size: 0.9rem;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.chartArea {
+    flex: 1;
+    min-height: 0;
+}
+
+.highlight {
+  border: 2px solid #4f46e5 !important;
+  box-shadow: 0 0 10px rgba(79, 70, 229, 0.6) !important;
+  z-index: 1001;
+  position: relative;
+  background: white !important;
+  opacity: 1 !important;
+  border-radius: 6px;
+}
+
+.faded {
+    opacity: 0.3 !important;
+    pointer-events: none;
+    filter: grayscale(0.5);
+}
+
+@media (min-width: 1024px) {
+    /* Side by side desktop layout if requested, but stacked was preferred for readability in theory. 
+       However, user asked for grid: Controls (left) Graphs (right). 
+       The parent Home.jsx handles the 300px 1fr split. 
+    */
+}
