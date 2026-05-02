@@ -1,3 +1,61 @@
+/**
+ * Signal Generator for Stochastic Processes.
+ * Supports AR models with configurable non-stationarity.
+ */
+export function generateStochasticSignal(options = {}) {
+  const {
+    fs = 500,
+    duration = 5,
+    p = 2, // AR order
+    noiseVariance = 0.1,
+    changePoint = 0.5, // 0 to 1
+    type = "structural", // "mean", "variance", "spectral", "structural"
+    arCoeffs1 = [0.8, -0.2], // Stationary segment 1
+    arCoeffs2 = [-0.5, 0.3], // Segment 2 (for structural/spectral)
+    meanShift = 2.0,
+    varMultiplier = 3.0
+  } = options;
+
+  const N = Math.floor(fs * duration);
+  const nStar = Math.floor(N * changePoint);
+  const x = new Array(N).fill(0);
+  const v = new Array(N);
+
+  // Generate white noise v(n)
+  for (let i = 0; i < N; i++) {
+    let currentVar = noiseVariance;
+    if (type === "variance" && i >= nStar) {
+      currentVar *= varMultiplier;
+    }
+    v[i] = (Math.random() - 0.5) * 2 * Math.sqrt(3 * currentVar); // Uniform noise with target variance
+  }
+
+  // Generate AR process: x(n) = -sum(a_k * x(n-k)) + v(n)
+  for (let n = 0; n < N; n++) {
+    let coeffs = arCoeffs1;
+    if ((type === "structural" || type === "spectral") && n >= nStar) {
+      coeffs = arCoeffs2;
+    }
+
+    let arSum = 0;
+    for (let k = 0; k < coeffs.length; k++) {
+      const idx = n - 1 - k;
+      if (idx >= 0) {
+        arSum -= coeffs[k] * x[idx];
+      }
+    }
+    x[n] = arSum + v[n];
+
+    // Add mean shift
+    if (type === "mean" && n >= nStar) {
+      x[n] += meanShift;
+    }
+  }
+
+  // Return formatted for Chart.js
+  return x.map((val, i) => ({ x: i / fs, y: val }));
+}
+
 function clampNumber(n, min, max) {
   if (!Number.isFinite(n)) return min;
   return Math.min(max, Math.max(min, n));

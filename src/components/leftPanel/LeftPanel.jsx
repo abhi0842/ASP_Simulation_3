@@ -41,42 +41,13 @@ export const LeftPanel = () => {
   const quizError = quizSubmitted ? Math.abs(Number(quizGuess) - changePoint) : null;
 
   // Common options for Chart.js
-  const getCommonOptions = (title, showMarkers = true) => ({
+  const getCommonOptions = (title) => ({
     responsive: true,
     maintainAspectRatio: false,
     animation: false,
     elements: { point: { radius: 0 } },
     plugins: {
       legend: { display: true, position: 'top' },
-      annotation: {
-        annotations: showMarkers && (!quizMode || quizSubmitted) ? {
-          changeLine: {
-            type: 'line',
-            xMin: changePoint,
-            xMax: changePoint,
-            borderColor: 'red',
-            borderWidth: 2,
-            borderDash: [6, 3],
-            label: { content: 'n*', enabled: true, position: 'start' }
-          },
-          lmsDetect: lmsResult?.detectedAt > 0 ? {
-            type: 'line',
-            xMin: lmsResult.detectedAt,
-            xMax: lmsResult.detectedAt,
-            borderColor: '#378ADD',
-            borderWidth: 2,
-            label: { content: 'LMS detect', enabled: true, position: 'end' }
-          } : undefined,
-          rlsDetect: rlsResult?.detectedAt > 0 ? {
-            type: 'line',
-            xMin: rlsResult.detectedAt,
-            xMax: rlsResult.detectedAt,
-            borderColor: '#2a9d4e',
-            borderWidth: 2,
-            label: { content: 'RLS detect', enabled: true, position: 'end' }
-          } : undefined,
-        } : {}
-      }
     },
     scales: {
       x: { type: 'linear', title: { display: true, text: 'Sample index (n)' } },
@@ -84,57 +55,119 @@ export const LeftPanel = () => {
     }
   });
 
+  const getVerticalLineDataset = (xValue, color, label, maxY = 1, dashed = true) => ({
+    label: label,
+    data: [{ x: xValue, y: 0 }, { x: xValue, y: maxY }],
+    borderColor: color,
+    borderWidth: 2,
+    borderDash: dashed ? [6, 3] : [],
+    pointRadius: 0,
+    showLine: true,
+    hidden: quizMode && !quizSubmitted
+  });
+
   // Chart 1: Error Power Data
-  const errorPowerChartData = {
-    datasets: [
+  const errorPowerChartData = useMemo(() => {
+    const lmsPeData = lmsResult?.Pe.map((v, i) => ({ x: i, y: v })) || [];
+    const rlsPeData = rlsResult?.Pe.map((v, i) => ({ x: i, y: v })) || [];
+    const thetaVal = (lmsResult?.theta || rlsResult?.theta) || 0;
+    const thetaData = currentSignal.map((_, i) => ({ x: i, y: thetaVal || null }));
+
+    // Find max Y for vertical lines
+    const allY = [...lmsPeData.map(p => p.y), ...rlsPeData.map(p => p.y), thetaVal];
+    const maxY = Math.max(0.1, ...allY) * 1.1;
+
+    const datasets = [
       {
         label: "LMS Pₑ(n)",
-        data: lmsResult?.Pe.map((v, i) => ({ x: i, y: v })) || [],
+        data: lmsPeData,
         borderColor: "#378ADD",
         borderWidth: 2,
         fill: false,
       },
       {
         label: "RLS Pₑ(n)",
-        data: rlsResult?.Pe.map((v, i) => ({ x: i, y: v })) || [],
+        data: rlsPeData,
         borderColor: "#2a9d4e",
         borderWidth: 2,
         fill: false,
       },
       {
         label: "Threshold θ",
-        data: currentSignal.map((_, i) => ({ x: i, y: (lmsResult?.theta || rlsResult?.theta) || null })),
+        data: thetaData,
         borderColor: "#E24B4A",
         borderWidth: 2,
         borderDash: [6, 3],
         fill: false,
       }
-    ]
-  };
+    ];
+
+    if (!quizMode || quizSubmitted) {
+      datasets.push(getVerticalLineDataset(changePoint, 'red', 'n*', maxY));
+      if (lmsResult?.detectedAt > 0) datasets.push(getVerticalLineDataset(lmsResult.detectedAt, '#378ADD', 'LMS detect', maxY, false));
+      if (rlsResult?.detectedAt > 0) datasets.push(getVerticalLineDataset(rlsResult.detectedAt, '#2a9d4e', 'RLS detect', maxY, false));
+    }
+
+    return { datasets };
+  }, [lmsResult, rlsResult, currentSignal, changePoint, quizMode, quizSubmitted]);
 
   // Chart 2: Weight Trajectory Data
-  const activeResult = lastRun === 'RLS' ? rlsResult : lmsResult;
-  const weightChartData = {
-    datasets: [
-      { label: "w₁", data: activeResult?.weightsHistory.map(h => ({ x: h.n, y: h.w[0] })) || [], borderColor: "#7F77DD", borderWidth: 2 },
-      { label: "w₂", data: activeResult?.weightsHistory.map(h => ({ x: h.n, y: h.w[1] })) || [], borderColor: "#D85A30", borderWidth: 2 },
-      { label: "w₃", data: activeResult?.weightsHistory.map(h => ({ x: h.n, y: h.w[2] })) || [], borderColor: "#888780", borderWidth: 2 },
-      { label: "w₄", data: activeResult?.weightsHistory.map(h => ({ x: h.n, y: h.w[3] })) || [], borderColor: "#378ADD", borderWidth: 2 }
-    ]
-  };
+  const weightChartData = useMemo(() => {
+    const activeResult = lastRun === 'RLS' ? rlsResult : lmsResult;
+    const w1Data = activeResult?.weightsHistory.map(h => ({ x: h.n, y: h.w[0] })) || [];
+    const w2Data = activeResult?.weightsHistory.map(h => ({ x: h.n, y: h.w[1] })) || [];
+    const w3Data = activeResult?.weightsHistory.map(h => ({ x: h.n, y: h.w[2] })) || [];
+    const w4Data = activeResult?.weightsHistory.map(h => ({ x: h.n, y: h.w[3] })) || [];
+
+    // Find max/min Y for vertical lines
+    const allY = [...w1Data.map(p => p.y), ...w2Data.map(p => p.y), ...w3Data.map(p => p.y), ...w4Data.map(p => p.y)];
+    const maxY = Math.max(0.1, ...allY) * 1.1;
+    const minY = Math.min(0, ...allY) * 1.1;
+
+    const datasets = [
+      { label: "w₁", data: w1Data, borderColor: "#7F77DD", borderWidth: 2 },
+      { label: "w₂", data: w2Data, borderColor: "#D85A30", borderWidth: 2 },
+      { label: "w₃", data: w3Data, borderColor: "#888780", borderWidth: 2 },
+      { label: "w₄", data: w4Data, borderColor: "#378ADD", borderWidth: 2 }
+    ];
+
+    if (!quizMode || quizSubmitted) {
+      datasets.push({
+        label: 'n*',
+        data: [{ x: changePoint, y: minY }, { x: changePoint, y: maxY }],
+        borderColor: 'red',
+        borderWidth: 2,
+        borderDash: [6, 3],
+        pointRadius: 0,
+        showLine: true,
+        hidden: quizMode && !quizSubmitted
+      });
+    }
+
+    return { datasets };
+  }, [lmsResult, rlsResult, lastRun, changePoint, quizMode, quizSubmitted]);
 
   // Chart 3: RLS Trace Data
-  const traceChartData = {
-    datasets: [
+  const traceChartData = useMemo(() => {
+    const tData = rlsResult?.traceP.map((v, i) => ({ x: i, y: v })) || [];
+    const maxY = Math.max(0.1, ...tData.map(p => p.y)) * 1.1;
+
+    const datasets = [
       {
         label: "tr(P(n))",
-        data: rlsResult?.traceP.map((v, i) => ({ x: i, y: v })) || [],
+        data: tData,
         borderColor: "#BA7517",
         borderWidth: 2,
         fill: false,
       }
-    ]
-  };
+    ];
+
+    if (!quizMode || quizSubmitted) {
+      datasets.push(getVerticalLineDataset(changePoint, 'red', 'n*', maxY));
+    }
+
+    return { datasets };
+  }, [rlsResult, changePoint, quizMode, quizSubmitted]);
 
   return (
     <div className={styles.leftPanelContainer}>
