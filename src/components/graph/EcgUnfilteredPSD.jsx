@@ -1,67 +1,33 @@
-import { useMemo, useContext } from "react";
+import { useContext, useMemo } from "react";
 import { SimulationContext } from "../../context/SimulationContext";
-import styles from "./ecgUnfilter.module.css";
+import { computePSD } from "../../utils/psd";
 import { Line } from "react-chartjs-2";
-import annotationPlugin from 'chartjs-plugin-annotation';
-import {
-  Chart as ChartJS,
-  LineElement,
-  PointElement,
-  LinearScale,
-  CategoryScale,
-  Tooltip,
-  Legend,
-} from "chart.js";
+import styles from "./ecgUnfilteredPSD.module.css";
 
-ChartJS.register(
-  LineElement,
-  PointElement,
-  LinearScale,
-  CategoryScale,
-  Tooltip,
-  Legend,
-  annotationPlugin
-);
-function resampleForDisplay(data, fsOriginal, fsUser) {
-  const step = fsOriginal / fsUser;
+export const EcgUnfilteredPSD = () => {
+  const { rawSamples, generateECG, originalFs, noisySamples } = useContext(SimulationContext);
 
-  if (step <= 1) return data; // show all if user wants higher rate
+  const psdData = useMemo(() => {
+    if (!generateECG || rawSamples.length === 0) return null;
+    const source =
+      noisySamples && noisySamples.length > 0 ? noisySamples : rawSamples;
 
-  const out = [];
-  for (let i = 0; i < data.length; i += step) {
-    out.push(data[Math.floor(i)]);
-  }
-  return out;
-}
-function inferFs(dataAll) {
-  if (dataAll.length < 2) return 500;
-  const dt = dataAll[1].x - dataAll[0].x;
-  // console.log(1 / dt);
-  if (dt > 0) return 1 / dt;
+    if (!source || source.length === 0) return null;
+    const signal = source.map((p) => p.y);
+    const data = computePSD(signal, originalFs);
 
-  return 500;
-}
+    return data;
+  }, [rawSamples, generateECG, originalFs, noisySamples]);
 
-export const EcgUnfilter = () => {
-  const { time, originalFs, generateECG, rawSamples, isChangeInjected } =
-    useContext(SimulationContext);
-
-  const { data, midpoint } = useMemo(() => {
-    if (!rawSamples.length || !generateECG) return { data: [], midpoint: 0 };
-    const fsOriginal = inferFs(rawSamples);
-    const displayData = resampleForDisplay(rawSamples, fsOriginal, originalFs);
-    const filtered = displayData.filter((p) => p.x <= time);
-    const mid = filtered.length > 0 ? filtered[Math.floor(filtered.length / 2)].x : 0;
-    return { data: filtered, midpoint: mid };
-  }, [time, originalFs, generateECG, rawSamples]);
+  if (!psdData) return null;
 
   const chartData = {
     datasets: [
       {
-        label: "Signal x(n)",
-        data,
-        borderColor: "#3498db",
-        borderWidth: 1.5,
+        label: "Unfiltered ECG PSD",
+        data: psdData.psd.map((p, i) => ({ x: psdData.freqs[i], y: p })),
+        borderColor: "#005FA7",
+        borderWidth: 1,
         pointRadius: 0,
         tension: 0,
       },
@@ -74,33 +40,19 @@ export const EcgUnfilter = () => {
     parsing: false,
     plugins: {
       legend: {
-        display: true,
+        display: false,
       },
-      annotation: {
-        annotations: isChangeInjected ? {
-          line1: {
-            type: 'line',
-            xMin: midpoint,
-            xMax: midpoint,
-            borderColor: 'gray',
-            borderWidth: 2,
-            borderDash: [5, 5],
-            label: {
-              content: 'Change Point',
-              enabled: true
-            }
-          }
-        } : {}
-      }
     },
     scales: {
       x: {
         type: "linear",
+        min: 0,
+        max: originalFs / 2,
         title: {
           display: true,
-          text: "Time (s)",
+          text: "Frequency (Hz)",
           font: {
-            size: 13,
+            size: 13, // ← X-axis label font size
             weight: "bold",
           },
         },
@@ -111,9 +63,11 @@ export const EcgUnfilter = () => {
         },
       },
       y: {
+        min: 0,
+        max: 2,
         title: {
           display: true,
-          text: "Amplitude",
+          text: "PSD(dB/Hz) x 10^3",
           font: {
             size: 13,
             weight: "bold",
@@ -130,7 +84,7 @@ export const EcgUnfilter = () => {
 
   return (
     <div className={styles.signalContainer}>
-      <h3>Signal (Unfiltered)</h3>
+      <h3>Power Spectral Density — Unfiltered ECG</h3>
       <Line data={chartData} options={options} />
     </div>
   );

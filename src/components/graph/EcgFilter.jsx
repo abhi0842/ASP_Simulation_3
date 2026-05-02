@@ -2,8 +2,7 @@ import { useMemo, useContext, useEffect } from "react";
 import { SimulationContext } from "../../context/SimulationContext";
 import styles from "./ecgFilter.module.css";
 import { Line } from "react-chartjs-2";
-import annotationPlugin from 'chartjs-plugin-annotation';
-import { filterSignalLMS, filterSignalRLS } from "../../utils/filters";
+import { filterSignalNLMS,filterSignalLMS, filterSignalRLS, calculateMSE } from "../../utils/filters";
 import {
   Chart as ChartJS,
   LineElement,
@@ -14,7 +13,7 @@ import {
   Legend,
 } from "chart.js";
 
-ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend, annotationPlugin);
+ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend);
 
 function resampleForDisplay(data, fsOriginal, fsUser) {
   const step = fsOriginal / fsUser;
@@ -36,182 +35,90 @@ export const EcgFilter = () => {
     time,
     originalFs,
     config,
+    cleanSignal,
     rawSamples,
     noisySamples,
     setFilteredSamples,
     setMetrics,
-    setDiagnostics,
-    thresholdK,
-    step,
-    steps,
   } = useContext(SimulationContext);
-
-  const currentStep = steps[step];
 
   const filteredData = useMemo(() => {
     const inputSamples = noisySamples.length > 0 ? noisySamples : rawSamples;
-    if (!inputSamples.length) return { mapped: [], error: [], Pe: [], flags: [], original: [] };
+    if (!inputSamples.length || !cleanSignal.length) return [];
 
     const fsOriginal = inferFs(inputSamples);
     const display = resampleForDisplay(inputSamples, fsOriginal, originalFs);
-    const xSignal = display.map((p) => p.y);
+    const noisy = display.map((p) => p.y);
+    const reference = cleanSignal.slice(0, noisy.length);
 
-    let results = { y: [], e: [], e2: [], Pe: [], detectionFlags: [] };
-
-    const options = {
-      filterOrder: config.filterOrder,
-      thresholdK: thresholdK,
-    };
-
-    if (config.filterType === "LMS") {
-      results = filterSignalLMS(xSignal, {
-        ...options,
+    let yFiltered = [];
+    if (config.filterType === "NLMS") {
+      yFiltered = filterSignalNLMS(noisy, reference, {
+        filterOrder: config.filterOrder,
         stepSize: config.stepSize,
       });
-    } else if (config.filterType === "RLS") {
-      results = filterSignalRLS(xSignal, {
-        ...options,
+    
+    } else if (config.filterType === "LMS") {
+      yFiltered = filterSignalLMS(noisy, reference, {
+        filterOrder: config.filterOrder,
+        stepSize: config.stepSize,
+      }) ;}
+      else {
+      yFiltered = filterSignalRLS(noisy, reference, {
+        filterOrder: config.filterOrder,
         forgettingFactor: config.forgettingFactor,
         regularization: config.regularization,
       });
     }
 
-    const mse = results.e2.reduce((a, b) => a + b, 0) / results.e2.length;
-    setMetrics({
-      algorithm: config.filterType,
-      order: config.filterOrder,
-      mse: mse.toFixed(6),
-    });
+    const mse = calculateMSE(reference, yFiltered);
+    setMetrics({ algorithm: config.filterType, order: config.filterOrder, mse: mse.toFixed(6) });
 
-    setDiagnostics({
-      error: results.e,
-      errorPower: results.Pe,
-      detectionFlags: results.detectionFlags,
-    });
-
-    const timePoints = display.map(p => p.x);
-    const midpoint = timePoints[Math.floor(timePoints.length / 2)];
-
-    return {
-      mapped: display.map((p, i) => ({ x: p.x, y: results.y[i] ?? 0 })),
-      original: display.map((p) => ({ x: p.x, y: p.y })),
-      error: display.map((p, i) => ({ x: p.x, y: results.e[i] ?? 0 })),
-      Pe: results.Pe.map((p, i) => ({ x: display[i].x, y: p })),
-      flags: results.detectionFlags.map((f, i) => (f ? { x: display[i].x, y: results.Pe[i] } : null)).filter(Boolean),
-      midpoint,
-      threshold: results.Pe.reduce((a, b) => a + b, 0) / results.Pe.length + thresholdK * Math.sqrt(results.Pe.reduce((a, b) => a + Math.pow(b - (results.Pe.reduce((a, b) => a + b, 0) / results.Pe.length), 2), 0) / results.Pe.length)
-    };
-  }, [time, originalFs, config, rawSamples, noisySamples, setMetrics, setDiagnostics, thresholdK]);
+    const mapped = display.map((p, i) => ({ x: p.x, y: yFiltered[i] ?? 0 }));
+    return mapped.filter((p) => p.x <= time);
+  }, [time, originalFs, config, cleanSignal, rawSamples, noisySamples, setMetrics]);
 
   useEffect(() => {
-    setFilteredSamples(filteredData.mapped);
-  }, [filteredData.mapped, setFilteredSamples]);
+    setFilteredSamples(filteredData);
+  }, [filteredData, setFilteredSamples]);
 
-  const commonOptions = {
+  const chartData = {
+    datasets: [
+      {
+        label: "Filtered ECG",
+        data: filteredData,
+        borderColor: "#2ecc71",
+        borderWidth: 1.5,
+        pointRadius: 0,
+        tension: 0,
+      },
+    ],
+  };
+
+  const options = {
     responsive: true,
     animation: false,
     parsing: false,
-    plugins: { 
-      legend: { display: true },
-      annotation: {
-        annotations: {
-          line1: {
-            type: 'line',
-            xMin: filteredData.midpoint,
-            xMax: filteredData.midpoint,
-            borderColor: 'gray',
-            borderWidth: 2,
-            borderDash: [5, 5],
-            label: {
-              content: 'Change Point',
-              enabled: true
-            }
-          }
-        }
-      }
-    },
+    plugins: { legend: { display: true } },
     scales: {
       x: { type: "linear", title: { display: true, text: "Time (s)" } },
-      y: { title: { display: true, text: "Amplitude" } },
+      y: { title: { display: true, text: "Amplitude (mV)" } },
     },
-  };
-
-  const trackingData = {
-    datasets: [
-      {
-        label: "Original Signal x(n)",
-        data: filteredData.original,
-        borderColor: "#3498db",
-        borderWidth: 1,
-        pointRadius: 0,
-      },
-      {
-        label: `Predicted y(n) (${config.filterType})`,
-        data: filteredData.mapped,
-        borderColor: config.filterType === "LMS" ? "#3498db" : "#e74c3c",
-        borderWidth: 2,
-        pointRadius: 0,
-      },
-    ],
-  };
-
-  const errorData = {
-    datasets: [
-      {
-        label: "Error e(n)",
-        data: filteredData.error,
-        borderColor: "#95a5a6",
-        borderWidth: 1,
-        pointRadius: 0,
-      },
-    ],
-  };
-
-  const detectionData = {
-    datasets: [
-      {
-        label: "Error Power P_e(n)",
-        data: filteredData.Pe,
-        borderColor: config.filterType === "LMS" ? "#3498db" : "#e74c3c",
-        borderWidth: 1.5,
-        pointRadius: 0,
-      },
-      {
-        label: "Threshold",
-        data: [{x: 0, y: filteredData.threshold}, {x: time, y: filteredData.threshold}],
-        borderColor: "rgba(0,0,0,0.2)",
-        borderDash: [2, 2],
-        pointRadius: 0,
-      },
-      {
-        label: "Detections",
-        data: filteredData.flags,
-        borderColor: "#f1c40f",
-        backgroundColor: "#f1c40f",
-        pointRadius: 4,
-        showLine: false,
-      },
-    ],
   };
 
   return (
     <div className={styles.signalContainer}>
-      <div className={styles.plotGroup}>
-        <h3>Signal Tracking</h3>
-        <Line data={trackingData} options={commonOptions} />
-      </div>
-
-      <div className={styles.plotGroup}>
-        <h3>Estimation Error</h3>
-        <Line data={errorData} options={commonOptions} />
-      </div>
-
-      <div className={`${styles.plotGroup} ${currentStep?.highlight === "detectionGraph" ? styles.highlight : ""}`}>
-        <h3>Non-Stationarity Detection</h3>
-        <Line data={detectionData} options={commonOptions} />
-      </div>
+      <h3>
+        ECG Signal (Filtered) <span>Algorithm: </span>
+        <span>
+             {config.filterType === "NLMS"
+            ? `NLMS — μ=${config.stepSize} — M=${config.filterOrder}`
+            : config.filterType === "LMS"
+            ? `LMS — μ=${config.stepSize} — M=${config.filterOrder}`
+            : `RLS — λ=${config.forgettingFactor} — M=${config.filterOrder}`}
+        </span>
+      </h3>
+      <Line data={chartData} options={options} />
     </div>
   );
-
 };
-

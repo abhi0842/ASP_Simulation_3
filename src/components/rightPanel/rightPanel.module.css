@@ -150,22 +150,18 @@ input[type="number"]:focus {
     justify-content: start;
     gap: 10px;
 }
-.psdContainer {
-    display: flex;
-    justify-content: center;
-    margin-top: 20px;
+.tealButton {
+    background: rgb(29 116 128) !important;
 }
 
-.highlight {
-    border: 2px solid yellow !important;
-    box-shadow: 0 0 10px yellow !important;
-    animation: pulse 1.5s infinite;
+.tealButton:hover {
+    background: #268eb4 !important;
 }
 
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.02); }
-    100% { transform: scale(1); }
+.presetGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
 }
 
 @media (max-width: 768px) {

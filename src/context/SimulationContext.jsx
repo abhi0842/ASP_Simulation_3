@@ -1,5 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useEffect, useRef, useState } from "react";
+import { generateStochasticSignal } from "../utils/filters";
+import { runLMS, runRLS, injectChangePoint } from "../adaptiveFilters";
 
 export const SimulationContext = createContext();
 
@@ -9,63 +11,60 @@ export const SimulationProvider = ({ children }) => {
   // Estimated sampling frequency (Hz)
   const [originalFs, setOriginalFs] = useState(500);
 
-  // ECG signals
-  const [rawSamples, setRawSamples] = useState([]); // array of { x: seconds, y: raw ECG }
+  // signals
+  const [rawSamples, setRawSamples] = useState([]); // original dataset samples
+  const [currentSignal, setCurrentSignal] = useState([]); // signal after injection
   const [noisySamples, setNoisySamples] = useState([]); // array of { x: seconds, y: noisy ECG }
-  const [cleanSignal, setCleanSignal] = useState([]); // numeric array reference ECG
   const [filteredSamples, setFilteredSamples] = useState([]); // array of { x, y } adaptive-filter output
-  const [diagnostics, setDiagnostics] = useState({
-    error: [],
-    errorPower: [],
-    detectionFlags: [],
-  });
- 
+  
+  // Results from predictors
+  const [lmsResult, setLmsResult] = useState(null);
+  const [rlsResult, setRlsResult] = useState(null);
+
+  // Non-stationarity state
+  const [changePoint, setChangePoint] = useState(1250); // index n*
+  const [injectionType, setInjectionType] = useState('ar');
+  const [wanderAmp, setWanderAmp] = useState(0.15);
+  const [noiseStd, setNoiseStd] = useState(0.12);
+  const [injected, setInjected] = useState(false);
+
+  // Quiz mode state
+  const [quizMode, setQuizMode] = useState(false);
+  const [quizGuess, setQuizGuess] = useState("");
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+
   // Adaptive filter params
   const [config, setConfig] = useState({
-    filterType: "NLMS", // "NLMS" or "RLS"
-    filterOrder: 32, // M
-    stepSize: 0.1, // mu
-    forgettingFactor: 0.99, // lambda
-    regularization: 0.01, // delta
+    filterType: "LMS",
+    filterOrder: 2, 
+    stepSize: 0.05, 
+    windowLength: 40,
+    thresholdK: 2.5,
+    forgettingFactor: 0.97,
+    regularization: 0.01,
   });
 
-  const [metrics, setMetrics] = useState({
-    algorithm: "NLMS",
-    order: 32,
-    mse: "0.000000",
-  });
-
-  // UI triggers (expected by components)
+  // UI triggers (RESTORING ORIGINAL NAMES)
   const [generateECG, setGenerateECG] = useState(false);
   const [applyNoiseTrigger, setApplyNoiseTrigger] = useState(false);
   const [filteredECG, setFilteredECG] = useState(false);
   const [applypsdTrigger, setApplypsdTrigger] = useState(false);
 
-  // Noise toggles (expected by EcgNoisy)
+  // Noise toggles
   const [noise, setNoise] = useState({
     baseline: false,
     powerline: false,
     emg: false,
   });
 
-  // ECG dataset selection (use Vite base URL so hosted base path works)
-  const [csvFilePath, setCsvFilePath] = useState(() => {
-    const base = import.meta.env.BASE_URL || "/";
-    const normalizedBase = base.endsWith("/") ? base : base + "/";
-    return normalizedBase + "ecg200.csv";
-  });
-  const prevPathRef = useRef(csvFilePath);
-
   // Instruction panel state / button ref used in Home.jsx
   const [showInstruction, setShowInstruction] = useState(false);
   const buttonRef = useRef(null);
 
   // --- Guided Mode State ---
+  const [guideActive, setGuideActive] = useState(false);
   const [step, setStep] = useState(0);
   const [actions, setActions] = useState({});
-  const [isChangeInjected, setIsChangeInjected] = useState(false);
-  const [noiseLevel, setNoiseLevel] = useState(0);
-  const [thresholdK, setThresholdK] = useState(3);
 
   const markAction = (action) => {
     setActions((prev) => ({ ...prev, [action]: true }));
@@ -73,188 +72,127 @@ export const SimulationProvider = ({ children }) => {
 
   const steps = [
     {
-      title: "Welcome to Non-Stationarity Detection Lab",
-      content:
-        "You will learn how LMS and RLS detect sudden changes in signals. Click Next to begin.",
+      title: "Non-Stationarity Lab",
+      content: "Learn how filters detect signal changes. Click Next to start.",
     },
     {
-      title: "Step 1: Generate ECG Signal",
-      content: "Click Generate Signal.",
+      title: "Step 1: Generate Signal",
+      content: "Click Generate Signal to create a stochastic process.",
       highlight: "generateButton",
       requiredAction: "GENERATE_SIGNAL",
     },
     {
-      title: "Step 2: Inject Change",
-      content: "Inject a mean and variance change.",
-      highlight: "injectChangeButton",
-      requiredAction: "INJECT_CHANGE",
+      title: "Step 2: Change Type",
+      content: "Select the type of non-stationarity (e.g., Structural).",
+      highlight: "signalTypeSelector",
     },
     {
-      title: "Step 3: Select Algorithm",
+      title: "Step 3: Algorithm",
       content: "Choose LMS or RLS.",
       highlight: "algorithmSelector",
       requiredAction: "SELECT_ALGO",
     },
     {
-      title: "Step 4: Adjust Parameters",
-      content: "Adjust μ or λ.",
-      highlight: "parameterSliders",
-      requiredAction: "ADJUST_PARAMS",
-    },
-    {
-      title: "Step 5: Run Simulation",
-      content: "Click Run.",
+      title: "Step 4: Run",
+      content: "Run simulation to see adaptation.",
       highlight: "runButton",
       requiredAction: "RUN_SIMULATION",
     },
     {
-      title: "Step 6: Observe Detection",
-      content: "Observe error spike and detection markers.",
-      highlight: "detectionGraph",
+      title: "Step 5: Error Spike",
+      content: "Observe the Error Spike at the change-point — it reveals WHEN the change occurred.",
+      highlight: "errorGraph",
     },
     {
-      title: "Step 7: Compare LMS vs RLS",
-      content: "Switch algorithms and compare.",
-      highlight: "algorithmToggle",
+      title: "Step 6: Weight Drift",
+      content: "Check Weight Trajectory to see how the model updated — it reveals WHAT changed.",
+      highlight: "weightsGraph",
     },
     {
-      title: "Step 8: Add Noise",
-      content: "Increase noise and observe false detections.",
-      highlight: "noiseSlider",
+      title: "Step 7: Matrix Trace",
+      content: "For RLS, notice the surge in tr(P) at the change-point, indicating rapid learning.",
     },
     {
       title: "Completed",
-      content: "You have completed the experiment.",
+      content: "Experiment finished!",
     },
   ];
 
-  useEffect(() => {
-    const current = steps[step];
-    if (current?.requiredAction && actions[current.requiredAction]) {
-      setStep((prev) => prev + 1);
-    }
-  }, [actions, step]);
-
-  const parseCsvECG = useCallback((text) => {
-    const lines = text
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter(Boolean);
-    if (lines.length < 2) return null;
-
-    const header = lines[0].split(",").map((h) => h.trim());
-    const timeIdx = header.findIndex((h) => h === "time_sec" || h.startsWith("time_sec"));
-    const rawIdx = header.findIndex((h) => h === "ECG_I" || h.includes("ECG_I"));
-    const cleanIdx = header.findIndex(
-      (h) => h === "ECG_I_filtered" || h.includes("ECG_I_filtered")
-    );
-
-    // Fallback to "first 3 columns" if headers don't match expected names
-    const resolvedTimeIdx = timeIdx >= 0 ? timeIdx : 0;
-    const resolvedRawIdx = rawIdx >= 0 ? rawIdx : 1;
-    const resolvedCleanIdx = cleanIdx >= 0 ? cleanIdx : 2;
-
-    const points = [];
-    const clean = [];
-    const times = [];
-
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(",");
-      const t = Number.parseFloat(cols[resolvedTimeIdx]);
-      const raw = Number.parseFloat(cols[resolvedRawIdx]);
-      const ref = Number.parseFloat(cols[resolvedCleanIdx]);
-      if (!Number.isFinite(t) || !Number.isFinite(raw) || !Number.isFinite(ref)) continue;
-      points.push({ x: t, y: raw });
-      clean.push(ref);
-      times.push(t);
-    }
-
-    if (points.length < 2) return null;
-
-    // Estimate sampling rate from x spacing (seconds)
-    let dtSum = 0;
-    let dtCount = 0;
-    for (let i = 1; i < Math.min(times.length, 200); i++) {
-      const dt = times[i] - times[i - 1];
-      if (dt > 0 && Number.isFinite(dt)) {
-        dtSum += dt;
-        dtCount++;
-      }
-    }
-    const fs = dtCount > 0 ? 1 / (dtSum / dtCount) : 500;
-
-    return { points, clean, fs };
-  }, []);
-
-  const loadECGFromCsv = useCallback(async () => {
-    try {
-      setRawSamples([]);
-      setNoisySamples([]);
-      setFilteredSamples([]);
-      setCleanSignal([]);
-
-      const res = await fetch(csvFilePath);
-      if (!res.ok) throw new Error(`Failed to load ECG CSV: ${res.status}`);
-      const text = await res.text();
-      const parsed = parseCsvECG(text);
-      if (!parsed) throw new Error("CSV parse failed (no usable rows).");
-
-      // Handle non-stationary change injection
-      if (isChangeInjected) {
-        const midpoint = Math.floor(parsed.points.length / 2);
-        for (let i = midpoint; i < parsed.points.length; i++) {
-          parsed.points[i].y = (parsed.points[i].y + 2.0) * 1.5;
-        }
-      }
-
-      // Handle noise level
-      if (noiseLevel > 0) {
-        for (let i = 0; i < parsed.points.length; i++) {
-          parsed.points[i].y += (Math.random() - 0.5) * noiseLevel;
-        }
-      }
-
-      setRawSamples(parsed.points);
-      setCleanSignal(parsed.clean);
-      setOriginalFs(parsed.fs);
-
-      // Reset triggers for a fresh run
-      setApplyNoiseTrigger(false);
-      setFilteredECG(false);
-      setApplypsdTrigger(false);
-      setMetrics({ algorithm: config.filterType, order: config.filterOrder, mse: "0.000000" });
-    } catch (e) {
-      console.error(e);
-    }
-  }, [csvFilePath, parseCsvECG, config.filterType, config.filterOrder]);
+  const currentStep = steps[step];
+  const canProceed = !currentStep?.requiredAction || actions[currentStep.requiredAction];
 
   useEffect(() => {
-    if (!generateECG) return;
-    loadECGFromCsv();
-  }, [generateECG, loadECGFromCsv]);
+    if (currentStep?.requiredAction && actions[currentStep.requiredAction]) {
+      setStep((prev) => Math.min(steps.length - 1, prev + 1));
+    }
+  }, [actions, currentStep, steps.length]);
+
+  const handleGenerateSignal = useCallback(() => {
+    const samples = generateStochasticSignal({
+      fs: originalFs,
+      duration: time,
+      type: "structural",
+      noiseVariance: 0.1,
+      changePoint: 0.5,
+    });
+    setRawSamples(samples);
+    setCurrentSignal(samples.map(s => s.y));
+    setFilteredECG(false);
+    setLmsResult(null);
+    setRlsResult(null);
+    setInjected(false);
+    setQuizSubmitted(false);
+    setChangePoint(Math.floor(samples.length / 2));
+  }, [originalFs, time]);
+
+  useEffect(() => {
+    if (generateECG) {
+      handleGenerateSignal();
+      setGenerateECG(false);
+    }
+  }, [generateECG, handleGenerateSignal]);
+
+  const handleInject = () => {
+    const originalY = rawSamples.map(s => s.y);
+    const injectedY = injectChangePoint(originalY, changePoint, injectionType, wanderAmp, noiseStd, originalFs);
+    setCurrentSignal(injectedY);
+    setInjected(true);
+    setQuizSubmitted(false);
+  };
+
+  const handleRunLMS = () => {
+    const res = runLMS(currentSignal, config.filterOrder, config.stepSize, config.windowLength, config.thresholdK);
+    setLmsResult(res);
+    markAction("RUN_SIMULATION");
+  };
+
+  const handleRunRLS = () => {
+    const res = runRLS(currentSignal, config.filterOrder, config.forgettingFactor, config.regularization, config.windowLength, config.thresholdK);
+    setRlsResult(res);
+    markAction("RUN_SIMULATION");
+  };
 
   return (
     <SimulationContext.Provider
       value={{
-        // graph time controls
         time,
         setTime,
         originalFs,
         setOriginalFs,
 
-        // signals
         rawSamples,
         setRawSamples,
+        currentSignal,
         noisySamples,
         setNoisySamples,
-        cleanSignal,
-        setCleanSignal,
         filteredSamples,
         setFilteredSamples,
-        diagnostics,
-        setDiagnostics,
+        
+        lmsResult,
+        rlsResult,
+        handleRunLMS,
+        handleRunRLS,
 
-        // triggers
         generateECG,
         setGenerateECG,
         applyNoiseTrigger,
@@ -264,40 +202,42 @@ export const SimulationProvider = ({ children }) => {
         applypsdTrigger,
         setApplypsdTrigger,
 
-        // noise toggles
         noise,
         setNoise,
 
-        // dataset selection
-        csvFilePath,
-        setCsvFilePath,
-        prevPathRef,
+        changePoint,
+        setChangePoint,
+        injectionType,
+        setInjectionType,
+        wanderAmp,
+        setWanderAmp,
+        noiseStd,
+        setNoiseStd,
+        handleInject,
+        injected,
 
-        // adaptive config
+        quizMode,
+        setQuizMode,
+        quizGuess,
+        setQuizGuess,
+        quizSubmitted,
+        setQuizSubmitted,
+
         config,
         setConfig,
 
-        // metrics
-        metrics,
-        setMetrics,
-
-        // instruction UI controls
         showInstruction,
         setShowInstruction,
         buttonRef,
 
-        // guided mode
         step,
         setStep,
         actions,
         markAction,
         steps,
-        isChangeInjected,
-        setIsChangeInjected,
-        noiseLevel,
-        setNoiseLevel,
-        thresholdK,
-        setThresholdK,
+        guideActive,
+        setGuideActive,
+        canProceed,
       }}
     >
       {children}

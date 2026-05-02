@@ -1,11 +1,10 @@
 import { useContext, useEffect, useRef } from "react";
 import styles from "./home.module.css";
-import { TopPanel } from "../../components/topPanel/TopPanel.jsx";
+import TopPanel from "../../components/topPanel/TopPanel.jsx";
 import { Instruction } from "../../components/instruction/Instruction.jsx";
 import { SimulationContext } from "../../context/SimulationContext.jsx";
 import { LeftPanel } from "../../components/leftPanel/LeftPanel.jsx";
 import { RightPanel } from "../../components/rightPanel/RightPanel.jsx";
-import { GuidedModal } from "../../components/guidedModal/GuidedModal.jsx";
 
 export const Home = () => {
   const { showInstruction, setShowInstruction, buttonRef } =
@@ -34,7 +33,6 @@ export const Home = () => {
 
   return (
     <div className={styles.grandContainer}>
-      <GuidedModal />
       <div className={styles.parentContainer}>
         <div className={styles.topContainer}>
           <TopPanel />
@@ -46,8 +44,8 @@ export const Home = () => {
               <Instruction />
             </div>
           )}
-          <RightPanel className={styles.leftPanelContainer} />
-          <LeftPanel className={styles.rightPanelContainer} />
+          <LeftPanel className={styles.leftPanelContainer} />
+          <RightPanel className={styles.rightPanelContainer} />
         </div>
         <div className={styles.footerContainer}>
           ©Copyright 2025 Virtual Labs, IIT Roorkee

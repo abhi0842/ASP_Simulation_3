@@ -1,232 +1,146 @@
-import { useContext, useState, useEffect } from "react";
-import { SimulationContext } from "../../context/SimulationContext";
+import { useContext, useState } from "react";
+import { SimulationContext } from "../../context/SimulationContext.jsx";
 import styles from "./rightPanel.module.css";
 import Swal from "sweetalert2";
 
 export const RightPanel = () => {
   const {
-    time,
-    setTime,
-    originalFs,
-    // setUserFs,
+    time, setTime,
+    rawSamples,
+    config, setConfig,
+    step, markAction, steps,
+    guideActive,
+    changePoint, setChangePoint,
+    injectionType, setInjectionType,
+    wanderAmp, setWanderAmp,
+    noiseStd, setNoiseStd,
+    handleInject,
+    handleRunLMS, handleRunRLS,
     setGenerateECG,
+    noise, setNoise,
     setApplyNoiseTrigger,
-    config,
-    setConfig,
-    setFilteredECG,
-    noise,
-    setNoise,
-    csvFilePath,
-    prevPathRef,
-    setCsvFilePath,
-    generateECG,
-    setApplypsdTrigger,
-    setFilteredSamples,
-    // Guided mode
-    step,
-    markAction,
-    steps,
-    isChangeInjected,
-    setIsChangeInjected,
-    noiseLevel,
-    setNoiseLevel,
-    thresholdK,
-    setThresholdK,
   } = useContext(SimulationContext);
 
   const currentStep = steps[step];
+  const isHighlighted = (id) => guideActive && currentStep?.highlight === id;
+  const isFaded = (id) => guideActive && currentStep?.highlight && currentStep.highlight !== id;
 
-  const [adaptiveAlgo, setAdaptiveAlgo] = useState(config.filterType === "NLMS" ? "LMS" : config.filterType);
-  const [filterOrder, setFilterOrder] = useState(config.filterOrder ?? 32);
-  const [stepSize, setStepSize] = useState(config.stepSize ?? 0.01);
-  const [forgettingFactor, setForgettingFactor] = useState(config.forgettingFactor ?? 0.99);
-  const [regularization, setRegularization] = useState(config.regularization ?? 0.01);
-  const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
-
-  const handleGenerateSignal = () => {
-    setGenerateECG(true);
-    markAction("GENERATE_SIGNAL");
-  };
-
-  const handleInjectChange = () => {
-    setIsChangeInjected(true);
-    markAction("INJECT_CHANGE");
-    setGenerateECG(true); // Re-generate with change
-  };
+  const N = rawSamples.length;
 
   const handleAlgoChange = (algo) => {
-    setAdaptiveAlgo(algo);
+    setConfig({ ...config, filterType: algo });
     markAction("SELECT_ALGO");
-    if (step >= 6) markAction("SELECT_ALGO"); // For Step 7 comparison
   };
 
-  const handleParamChange = (type, val) => {
-    if (type === "mu") setStepSize(val);
-    if (type === "lambda") setForgettingFactor(val);
-    markAction("ADJUST_PARAMS");
+  const handleNoiseToggle = (key) => {
+    setNoise({ ...noise, [key]: !noise[key] });
   };
-
-  const handleNoiseChange = (val) => {
-    setNoiseLevel(val);
-    markAction("ADJUST_PARAMS");
-    if (step >= 8) markAction("ADJUST_PARAMS"); // For Step 8 noise
-    setGenerateECG(true); // Re-generate with noise
-  };
-
-  const base = import.meta.env.BASE_URL || "/";
-  const normalizedBase = base.endsWith("/") ? base : base + "/";
-  const assetPath = (name) => normalizedBase + name;
-  const runFilter = () => {
-    if (!generateECG) {
-      Swal.fire({
-        icon: "info",
-        title: "Oops...",
-        text: "Please generate signal first!",
-      });
-      return;
-    }
-
-    const sanitizedOrder = clamp(Math.floor(Number(filterOrder) || 1), 1, 256);
-    const sanitizedMu = adaptiveAlgo === "LMS"
-      ? clamp(Number(stepSize) || 0.01, 1e-8, 1)
-      : 0.1;
-    const sanitizedLambda = clamp(Number(forgettingFactor) || 0.99, 0.9, 0.999999);
-    const sanitizedDelta = clamp(Number(regularization) || 0.01, 1e-12, 1);
-
-    setFilterOrder(sanitizedOrder);
-    if (adaptiveAlgo === "LMS") setStepSize(sanitizedMu);
-    setForgettingFactor(Math.round(sanitizedLambda * 1e6) / 1e6);
-    setRegularization(Number(sanitizedDelta));
-
-    const newConfig = {
-      ...config,
-      filterType: adaptiveAlgo,
-      filterOrder: sanitizedOrder,
-      stepSize: sanitizedMu,
-      forgettingFactor: sanitizedLambda,
-      regularization: sanitizedDelta,
-    };
-    setConfig(newConfig);
-    setFilteredECG(true);
-    markAction("RUN_SIMULATION");
-  };
-
-  useEffect(() => {
-    if (prevPathRef.current !== csvFilePath) {
-      setApplyNoiseTrigger(false);
-      setFilteredECG(false);
-      setApplypsdTrigger(false);
-      setFilteredSamples([]);
-      prevPathRef.current = csvFilePath;
-    }
-  }, [csvFilePath, prevPathRef, setApplyNoiseTrigger, setFilteredECG, setApplypsdTrigger, setFilteredSamples]); 
 
   return (
     <div className={styles.rightPanelContainer}>
       <div className={styles.right}>
-        <h2>Non-Stationarity Detection Lab</h2>
+        <h2>Control Panel</h2>
 
-        <div className={`${styles.box} ${currentStep?.highlight === "generateButton" ? styles.highlight : ""}`}>
+        {/* Card 1: Signal Setup */}
+        <div className={`${styles.box} ${isFaded("generateButton") ? styles.faded : ""} ${isHighlighted("generateButton") ? styles.highlight : ""}`}>
           <h3>Signal Setup</h3>
           <label>Select Dataset</label>
-          <select value={csvFilePath} onChange={(e) => setCsvFilePath(e.target.value)}>
-            <option value={assetPath("ecg200.csv")}>Dataset 1</option>
-            <option value={assetPath("ecg300.csv")}>Dataset 2</option>
-            <option value={assetPath("ecg100.csv")}>Dataset 3</option>
+          <select>
+            <option>Dataset 1</option>
+            <option>Dataset 2</option>
+            <option>Dataset 3</option>
           </select>
 
-          <label>Duration (seconds) : <span>{time} s</span></label>
-          <input
-            type="range"
-            min="1"
-            max="50"
-            value={time}
-            onChange={(e) => setTime(Number(e.target.value))}
-          />
-
-          <button onClick={handleGenerateSignal}>
-            Generate Signal
-          </button>
-
-          <button 
-            className={`${currentStep?.highlight === "injectChangeButton" ? styles.highlight : ""}`}
-            onClick={handleInjectChange}
-            style={{ marginTop: "10px", backgroundColor: isChangeInjected ? "#27ae60" : "#e67e22" }}
-          >
-            {isChangeInjected ? "Change Injected ✓" : "Inject Change"}
-          </button>
+          <label>Duration: {time}s</label>
+          <input type="range" min="2" max="10" value={time} onChange={(e) => setTime(Number(e.target.value))} />
+          
+          <label>Sampling Rate: 500 Hz</label>
+          <button onClick={() => { setGenerateECG(true); markAction("GENERATE_SIGNAL"); }}>Generate ECG Signal</button>
         </div>
 
-        <div className={`${styles.box} ${currentStep?.highlight === "algorithmSelector" || currentStep?.highlight === "algorithmToggle" ? styles.highlight : ""}`}>
-          <h3>Adaptive Filter</h3>
+        {/* Card 2: Add Noise */}
+        <div className={styles.box}>
+          <h3>Add Noise</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            <label><input type="checkbox" checked={noise.baseline} onChange={() => handleNoiseToggle('baseline')} /> Baseline Wander</label>
+            <label><input type="checkbox" checked={noise.powerline} onChange={() => handleNoiseToggle('powerline')} /> Powerline (50Hz)</label>
+            <label><input type="checkbox" checked={noise.emg} onChange={() => handleNoiseToggle('emg')} /> EMG Noise</label>
+          </div>
+          <button onClick={() => setApplyNoiseTrigger(true)} style={{ marginTop: '10px' }}>Add Noise to Signal</button>
+        </div>
 
+        {/* Card 3: Adaptive Filter */}
+        <div className={`${styles.box} ${isFaded("algorithmSelector") ? styles.faded : ""} ${isHighlighted("algorithmSelector") ? styles.highlight : ""}`}>
+          <h3>Adaptive Filter (NLMS / LMS / RLS)</h3>
           <label>Algorithm</label>
-          <select value={adaptiveAlgo} onChange={(e) => handleAlgoChange(e.target.value)}>
-            <option value="LMS">LMS (Slow Adaptation)</option>
-            <option value="RLS">RLS (Fast Adaptation)</option>
+          <select value={config.filterType} onChange={(e) => handleAlgoChange(e.target.value)}>
+            <option value="LMS">LMS</option>
+            <option value="RLS">RLS</option>
           </select>
 
-          <div className={`${currentStep?.highlight === "parameterSliders" ? styles.highlight : ""}`}>
-            {adaptiveAlgo === "LMS" ? (
-              <>
-                <label>Step size μ: {stepSize}</label>
-                <input
-                  type="range"
-                  min="0.001"
-                  max="0.1"
-                  step="0.001"
-                  value={stepSize}
-                  onChange={(e) => handleParamChange("mu", Number(e.target.value))}
-                />
-              </>
-            ) : (
-              <>
-                <label>Forgetting factor λ: {forgettingFactor}</label>
-                <input
-                  type="range"
-                  min="0.90"
-                  max="0.999"
-                  step="0.001"
-                  value={forgettingFactor}
-                  onChange={(e) => handleParamChange("lambda", Number(e.target.value))}
-                />
-              </>
-            )}
-          </div>
+          <label>Filter Order M</label>
+          <input type="number" value={config.filterOrder} onChange={(e) => setConfig({...config, filterOrder: Number(e.target.value)})} />
 
-          <div className={`${currentStep?.highlight === "noiseSlider" ? styles.highlight : ""}`} style={{ marginTop: "15px" }}>
-            <label>Noise Level: {noiseLevel}</label>
-            <input
-              type="range"
-              min="0"
-              max="2"
-              step="0.1"
-              value={noiseLevel}
-              onChange={(e) => handleNoiseChange(Number(e.target.value))}
-            />
-          </div>
+          <label>Step size µ (0.01 to 0.2)</label>
+          <input type="range" min="0.01" max="0.2" step="0.01" value={config.stepSize} onChange={(e) => setConfig({...config, stepSize: Number(e.target.value)})} />
 
-          <label style={{ marginTop: "15px" }}>Threshold K: {thresholdK}</label>
-          <input
-            type="range"
-            min="1"
-            max="10"
-            step="0.5"
-            value={thresholdK}
-            onChange={(e) => setThresholdK(Number(e.target.value))}
+          {/* NEW FIELDS */}
+          <label>Window Length L (10–100)</label>
+          <input type="number" value={config.windowLength} onChange={(e) => setConfig({...config, windowLength: Number(e.target.value)})} />
+
+          <label>Threshold K (1.5–4.0)</label>
+          <input type="number" step="0.1" value={config.thresholdK} onChange={(e) => setConfig({...config, thresholdK: Number(e.target.value)})} />
+
+          {config.filterType === "RLS" && (
+            <>
+              <label>Forgetting factor λ (RLS)</label>
+              <input type="number" step="0.01" value={config.forgettingFactor} onChange={(e) => setConfig({...config, forgettingFactor: Number(e.target.value)})} />
+              <label>Init delta δ (RLS)</label>
+              <input type="number" step="0.01" value={config.regularization} onChange={(e) => setConfig({...config, regularization: Number(e.target.value)})} />
+            </>
+          )}
+
+          <div style={{ display: 'flex', gap: '5px', marginTop: '15px' }}>
+            <button className={styles.tealButton} onClick={handleRunLMS}>Run LMS Predictor</button>
+            <button className={styles.tealButton} onClick={handleRunRLS}>Run RLS Predictor</button>
+            <button className={styles.tealButton} onClick={() => { handleRunLMS(); handleRunRLS(); }}>Compare Both</button>
+          </div>
+          
+          <div style={{ marginTop: '10px' }}>
+            <button>Apply Filter</button>
+            <button>Compute PSD</button>
+          </div>
+        </div>
+
+        {/* Card 4: Non-Stationarity Injection */}
+        <div className={styles.box}>
+          <h3>Non-Stationarity Injection</h3>
+          <label>Change-point n* position: Sample {changePoint} / {N}</label>
+          <input 
+            type="range" 
+            min="100" 
+            max={N > 200 ? N - 100 : 100} 
+            value={changePoint} 
+            onChange={(e) => setChangePoint(Number(e.target.value))} 
           />
 
-          <div className={styles.psdContainer}>
-            <button 
-              className={`${currentStep?.highlight === "runButton" ? styles.highlight : ""}`}
-              onClick={runFilter}
-            >
-              Run Simulation
-            </button>
-          </div>
+          <label>Non-stationarity type</label>
+          <select value={injectionType} onChange={(e) => setInjectionType(e.target.value)}>
+            <option value="ar">AR Parameter Shift (Spectral)</option>
+            <option value="wander">Baseline Wander (Mean)</option>
+            <option value="variance">Variance Jump (EMG-style)</option>
+            <option value="all">All Combined</option>
+          </select>
+
+          <label>Wander Amplitude (0–0.5): {wanderAmp}</label>
+          <input type="range" min="0" max="0.5" step="0.01" value={wanderAmp} onChange={(e) => setWanderAmp(Number(e.target.value))} />
+
+          <label>Noise Std (0.05–0.4): {noiseStd}</label>
+          <input type="range" min="0.05" max="0.4" step="0.01" value={noiseStd} onChange={(e) => setNoiseStd(Number(e.target.value))} />
+
+          <button className={styles.tealButton} onClick={handleInject}>Inject Change-point</button>
         </div>
       </div>
     </div>
   );
-
 };

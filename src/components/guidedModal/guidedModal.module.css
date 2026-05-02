@@ -1,34 +1,55 @@
 .modalOverlay {
   position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 80px;
+  right: 20px;
   z-index: 1000;
-  width: 90%;
-  max-width: 500px;
+  width: 320px;
   pointer-events: none;
 }
 
-.modalContent {
+.modal {
   background: white;
-  padding: 20px;
+  padding: 16px;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  border: 2px solid #0078d4;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  border: 3px solid #ffd400;
   pointer-events: auto;
-  text-align: center;
+  text-align: left;
+  animation: slideIn 0.3s ease-out;
 }
 
-.modalContent h2 {
+@keyframes slideIn {
+  from { transform: translateX(50px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.modal h2 {
   margin-top: 0;
   color: #0078d4;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
+  font-weight: 700;
 }
 
-.modalContent p {
-  margin: 15px 0;
-  font-size: 1rem;
-  line-height: 1.4;
+.modal p {
+  margin: 10px 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #333;
+}
+
+.closeIcon {
+  position: absolute;
+  top: 5px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #888;
+}
+
+.footer {
+  margin-top: 15px;
 }
 
 .nextButton {
@@ -42,6 +63,11 @@
   transition: background-color 0.2s;
 }
 
-.nextButton:hover {
+.nextButton:hover:not(:disabled) {
   background-color: #005a9e;
+}
+
+.nextButton:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }

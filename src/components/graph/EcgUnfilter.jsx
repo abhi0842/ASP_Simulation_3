@@ -2,7 +2,6 @@ import { useMemo, useContext } from "react";
 import { SimulationContext } from "../../context/SimulationContext";
 import styles from "./ecgUnfilter.module.css";
 import { Line } from "react-chartjs-2";
-import annotationPlugin from 'chartjs-plugin-annotation';
 import {
   Chart as ChartJS,
   LineElement,
@@ -19,8 +18,7 @@ ChartJS.register(
   LinearScale,
   CategoryScale,
   Tooltip,
-  Legend,
-  annotationPlugin
+  Legend
 );
 function resampleForDisplay(data, fsOriginal, fsUser) {
   const step = fsOriginal / fsUser;
@@ -43,25 +41,25 @@ function inferFs(dataAll) {
 }
 
 export const EcgUnfilter = () => {
-  const { time, originalFs, generateECG, rawSamples, isChangeInjected } =
+  const { time, originalFs, setGenerateSignal, rawSamples } =
     useContext(SimulationContext);
 
-  const { data, midpoint } = useMemo(() => {
-    if (!rawSamples.length || !generateECG) return { data: [], midpoint: 0 };
+  const data = useMemo(() => {
+    if (!rawSamples.length) return [];
     const fsOriginal = inferFs(rawSamples);
     const displayData = resampleForDisplay(rawSamples, fsOriginal, originalFs);
-    const filtered = displayData.filter((p) => p.x <= time);
-    const mid = filtered.length > 0 ? filtered[Math.floor(filtered.length / 2)].x : 0;
-    return { data: filtered, midpoint: mid };
-  }, [time, originalFs, generateECG, rawSamples]);
+    return displayData.filter((p) => p.x <= time);
+  }, [time, originalFs, rawSamples]);
+
 
   const chartData = {
     datasets: [
       {
-        label: "Signal x(n)",
+        label: "ECG Signal",
         data,
-        borderColor: "#3498db",
-        borderWidth: 1.5,
+        borderColor: "#0078d4",
+
+        borderWidth: 1,
         pointRadius: 0,
         tension: 0,
       },
@@ -74,24 +72,8 @@ export const EcgUnfilter = () => {
     parsing: false,
     plugins: {
       legend: {
-        display: true,
+        display: false,
       },
-      annotation: {
-        annotations: isChangeInjected ? {
-          line1: {
-            type: 'line',
-            xMin: midpoint,
-            xMax: midpoint,
-            borderColor: 'gray',
-            borderWidth: 2,
-            borderDash: [5, 5],
-            label: {
-              content: 'Change Point',
-              enabled: true
-            }
-          }
-        } : {}
-      }
     },
     scales: {
       x: {
@@ -100,7 +82,7 @@ export const EcgUnfilter = () => {
           display: true,
           text: "Time (s)",
           font: {
-            size: 13,
+            size: 13, // ← X-axis label font size
             weight: "bold",
           },
         },
@@ -113,7 +95,7 @@ export const EcgUnfilter = () => {
       y: {
         title: {
           display: true,
-          text: "Amplitude",
+          text: "Amplitude (mV)",
           font: {
             size: 13,
             weight: "bold",
@@ -130,7 +112,7 @@ export const EcgUnfilter = () => {
 
   return (
     <div className={styles.signalContainer}>
-      <h3>Signal (Unfiltered)</h3>
+      <h3>ECG Signal (Unfiltered)</h3>
       <Line data={chartData} options={options} />
     </div>
   );

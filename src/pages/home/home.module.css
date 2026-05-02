@@ -12,22 +12,13 @@
     position: relative;
     background-color: transparent;
     box-sizing: border-box;
-    width: 100%;
-    max-width: 1400px;
+    width: 80%;
     margin: 0 auto;
     box-shadow: 0px 0px 10px #00000015;
     border-radius: 10px;
     display: flex;
     align-items: center;
     flex-direction: column;
-    transition: all 0.3s ease;
-}
-
-.appBlur {
-    filter: blur(2px);
-    opacity: 0.8;
-    pointer-events: none;
-    user-select: none;
 }
 
 .topContainer {
@@ -42,41 +33,13 @@
 }
 
 .middleContainer {
-    flex: 1;
-    display: grid;
-    grid-template-columns: 350px 1fr;
-    gap: 20px;
-    padding: 20px;
-    overflow: hidden;
     position: relative;
-    max-width: 1600px;
-    margin: 0 auto;
+    background-color: #fcfcf9;
     width: 100%;
-}
-
-.leftPanelContainer {
-    overflow-y: auto;
-    padding-right: 10px;
-}
-
-.rightPanelContainer {
-    overflow-y: auto;
-    padding-right: 10px;
-}
-
-@media (max-width: 1024px) {
-    .middleContainer {
-        grid-template-columns: 1fr;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .leftPanelContainer, .rightPanelContainer {
-        overflow-y: visible;
-        width: 100%;
-        padding: 0;
-    }
+    display: flex;
+    justify-content: center;
+    align-items: start;
+    flex-direction: row-reverse;
 }
 
 .instructionContainer {
