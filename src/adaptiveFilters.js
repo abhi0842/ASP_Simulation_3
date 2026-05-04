@@ -116,13 +116,14 @@ export function injectChangePoint(originalSignal, changePoint, type, wanderAmp, 
   }
   if (type === 'wander' || type === 'all') {
     // More aggressive baseline wander
+    const wanderFs = fs || 500;
     for (let n = changePoint; n < N; n++)
-      sig[n] += wanderAmp * 2 * Math.sin(2 * Math.PI * 0.2 * (n - changePoint) / fs);
+      sig[n] += wanderAmp * 4 * Math.sin(2 * Math.PI * 0.5 * (n - changePoint) / wanderFs);
   }
   if (type === 'variance' || type === 'all') {
     // Higher variance jump
     for (let n = changePoint; n < N; n++)
-      sig[n] += noiseStd * 5 * (Math.random() * 2 - 1);
+      sig[n] += noiseStd * 8 * (Math.random() * 2 - 1);
   }
   return sig;
 }

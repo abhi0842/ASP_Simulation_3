@@ -41,15 +41,22 @@ function inferFs(dataAll) {
 }
 
 export const EcgUnfilter = () => {
-  const { time, originalFs, setGenerateSignal, rawSamples } =
+  const { time, originalFs, setGenerateSignal, rawSamples, currentSignal } =
     useContext(SimulationContext);
 
   const data = useMemo(() => {
-    if (!rawSamples.length) return [];
-    const fsOriginal = inferFs(rawSamples);
-    const displayData = resampleForDisplay(rawSamples, fsOriginal, originalFs);
+    if (!rawSamples.length || !currentSignal.length) return [];
+    
+    // Map currentSignal (Y values) back to time points
+    const mappedSamples = rawSamples.map((s, i) => ({
+      x: s.x,
+      y: currentSignal[i] !== undefined ? currentSignal[i] : s.y
+    }));
+
+    const fsOriginal = inferFs(mappedSamples);
+    const displayData = resampleForDisplay(mappedSamples, fsOriginal, originalFs);
     return displayData.filter((p) => p.x <= time);
-  }, [time, originalFs, rawSamples]);
+  }, [time, originalFs, rawSamples, currentSignal]);
 
 
   const chartData = {
@@ -68,44 +75,21 @@ export const EcgUnfilter = () => {
 
   const options = {
     responsive: true,
-    animation: true,
+    maintainAspectRatio: false,
+    animation: false,
     parsing: false,
     plugins: {
-      legend: {
-        display: false,
-      },
+      legend: { display: false },
     },
     scales: {
       x: {
         type: "linear",
-        title: {
-          display: true,
-          text: "Time (s)",
-          font: {
-            size: 13, // ← X-axis label font size
-            weight: "bold",
-          },
-        },
-        ticks: {
-          font: {
-            size: 13,
-          },
-        },
+        title: { display: true, text: "Time (s)", font: { size: 12, weight: "bold" } },
+        ticks: { font: { size: 11 } },
       },
       y: {
-        title: {
-          display: true,
-          text: "Amplitude (mV)",
-          font: {
-            size: 13,
-            weight: "bold",
-          },
-        },
-        ticks: {
-          font: {
-            size: 12,
-          },
-        },
+        title: { display: true, text: "Amplitude (mV)", font: { size: 12, weight: "bold" } },
+        ticks: { font: { size: 11 } },
       },
     },
   };
@@ -113,7 +97,9 @@ export const EcgUnfilter = () => {
   return (
     <div className={styles.signalContainer}>
       <h3>ECG Signal (Unfiltered)</h3>
-      <Line data={chartData} options={options} />
+      <div className={styles.graphContainer}>
+        <Line data={chartData} options={options} />
+      </div>
     </div>
   );
 };

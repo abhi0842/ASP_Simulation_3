@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useEffect, useRef, useState } from "react";
+import Papa from "papaparse";
 import { generateStochasticSignal } from "../utils/filters";
 import { runLMS, runRLS, injectChangePoint } from "../adaptiveFilters";
 
@@ -60,6 +61,10 @@ export const SimulationProvider = ({ children }) => {
   // Instruction panel state / button ref used in Home.jsx
   const [showInstruction, setShowInstruction] = useState(false);
   const buttonRef = useRef(null);
+
+  // Dataset selection
+  const [csvFileName, setCsvFileName] = useState("ecg100.csv");
+  const [useSynthetic, setUseSynthetic] = useState(false);
 
   // --- Guided Mode State ---
   const [guideActive, setGuideActive] = useState(false);
@@ -128,22 +133,53 @@ export const SimulationProvider = ({ children }) => {
   }, [actions, currentStep, steps.length]);
 
   const handleGenerateSignal = useCallback(() => {
-    const samples = generateStochasticSignal({
-      fs: originalFs,
-      duration: time,
-      type: "structural",
-      noiseVariance: 0.1,
-      changePoint: 0.5,
-    });
-    setRawSamples(samples);
-    setCurrentSignal(samples.map(s => s.y));
+    if (useSynthetic) {
+      const samples = generateStochasticSignal({
+        fs: originalFs,
+        duration: time,
+        type: "structural",
+        noiseVariance: 0.1,
+        changePoint: 0.5,
+      });
+      setRawSamples(samples);
+      setCurrentSignal(samples.map(s => s.y));
+      resetSimulation(samples.length);
+    } else {
+      const base = import.meta.env.BASE_URL || "/";
+      const normalizedBase = base.endsWith("/") ? base : base + "/";
+      const filePath = `${normalizedBase}${csvFileName}`;
+      
+      Papa.parse(filePath, {
+        download: true,
+        header: false,
+        dynamicTyping: true,
+        complete: (results) => {
+          const data = results.data.flat().filter(v => typeof v === 'number');
+          // Map to time points based on duration and fs
+          const N = Math.min(data.length, Math.floor(time * originalFs));
+          const samples = data.slice(0, N).map((y, i) => ({
+            x: i / originalFs,
+            y: y
+          }));
+          setRawSamples(samples);
+          setCurrentSignal(samples.map(s => s.y));
+          resetSimulation(samples.length);
+        },
+        error: (err) => {
+          console.error("Error loading CSV:", err);
+        }
+      });
+    }
+  }, [useSynthetic, csvFileName, originalFs, time]);
+
+  const resetSimulation = (length) => {
     setFilteredECG(false);
     setLmsResult(null);
     setRlsResult(null);
     setInjected(false);
     setQuizSubmitted(false);
-    setChangePoint(Math.floor(samples.length / 2));
-  }, [originalFs, time]);
+    setChangePoint(Math.floor(length / 2));
+  };
 
   useEffect(() => {
     if (generateECG) {
@@ -158,6 +194,17 @@ export const SimulationProvider = ({ children }) => {
     setCurrentSignal(injectedY);
     setInjected(true);
     setQuizSubmitted(false);
+    // Clear previous results as they are no longer valid for the new signal
+    setLmsResult(null);
+    setRlsResult(null);
+    markAction("INJECT_CHANGE");
+  };
+
+  const handleRestore = () => {
+    setCurrentSignal(rawSamples.map(s => s.y));
+    setInjected(false);
+    setLmsResult(null);
+    setRlsResult(null);
   };
 
   const handleRunLMS = () => {
@@ -205,6 +252,11 @@ export const SimulationProvider = ({ children }) => {
         noise,
         setNoise,
 
+        csvFileName,
+        setCsvFileName,
+        useSynthetic,
+        setUseSynthetic,
+
         changePoint,
         setChangePoint,
         injectionType,
@@ -214,6 +266,7 @@ export const SimulationProvider = ({ children }) => {
         noiseStd,
         setNoiseStd,
         handleInject,
+        handleRestore,
         injected,
 
         quizMode,

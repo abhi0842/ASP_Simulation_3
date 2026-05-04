@@ -54,21 +54,30 @@ export const EcgNoisy = () => {
     setApplyNoiseTrigger,
     noise,
     rawSamples,
+    currentSignal,
     setNoisySamples,
+    injected,
   } = useContext(SimulationContext);
 
   // toggle when all noise is false
   useEffect(() => {
-    if (!noise.baseline && !noise.powerline && !noise.emg) {
+    if (!noise.baseline && !noise.powerline && !noise.emg && !injected) {
       setApplyNoiseTrigger(false);
     }
-  }, [noise, setApplyNoiseTrigger]);
+  }, [noise, injected, setApplyNoiseTrigger]);
 
   const data = useMemo(() => {
-    if (!rawSamples.length || !applyNoiseTrigger) return [];
+    if (!rawSamples.length || !currentSignal.length) return [];
+    if (!applyNoiseTrigger && !injected) return [];
 
-    const fsOriginal = inferFs(rawSamples);
-    const displayData = resampleForDisplay(rawSamples, fsOriginal, originalFs);
+    // Map currentSignal (Y values) back to time points
+    const mappedSamples = rawSamples.map((s, i) => ({
+      x: s.x,
+      y: currentSignal[i] !== undefined ? currentSignal[i] : s.y
+    }));
+
+    const fsOriginal = inferFs(mappedSamples);
+    const displayData = resampleForDisplay(mappedSamples, fsOriginal, originalFs);
     const limited = displayData.filter((p) => p.x <= time);
     // compute noise inline to avoid state setting in effect
     let y = limited.map((p) => p.y);
@@ -83,7 +92,7 @@ export const EcgNoisy = () => {
     }
     //console.log("limited", limited, limited.map((p, i) => ({ x: p.x, y: y[i] })));
     return limited.map((p, i) => ({ x: p.x, y: y[i] }));
-  }, [applyNoiseTrigger, noise, time, originalFs, rawSamples]);
+  }, [applyNoiseTrigger, noise, time, originalFs, rawSamples, currentSignal, injected]);
 
   useEffect(() => {
     setNoisySamples(data);
@@ -112,44 +121,21 @@ export const EcgNoisy = () => {
 
   const options = {
     responsive: true,
-    animation: true,
+    maintainAspectRatio: false,
+    animation: false,
     parsing: false,
     plugins: {
-      legend: {
-        display: false,
-      },
+      legend: { display: false },
     },
     scales: {
       x: {
         type: "linear",
-        title: {
-          display: true,
-          text: "Time (s)",
-          font: {
-            size: 13, // ← X-axis label font size
-            weight: "bold",
-          },
-        },
-        ticks: {
-          font: {
-            size: 13,
-          },
-        },
+        title: { display: true, text: "Time (s)", font: { size: 12, weight: "bold" } },
+        ticks: { font: { size: 11 } },
       },
       y: {
-        title: {
-          display: true,
-          text: "Amplitude (mV)",
-          font: {
-            size: 13,
-            weight: "bold",
-          },
-        },
-        ticks: {
-          font: {
-            size: 12,
-          },
-        },
+        title: { display: true, text: "Amplitude (mV)", font: { size: 12, weight: "bold" } },
+        ticks: { font: { size: 11 } },
       },
     },
   };
@@ -173,8 +159,9 @@ export const EcgNoisy = () => {
           {noise.emg ? "Muscle Noise" : ""})
         </span>
       </h3>
-
-      <Line data={chartData} options={options} />
+      <div className={styles.graphContainer}>
+        <Line data={chartData} options={options} />
+      </div>
     </div>
   );
 };

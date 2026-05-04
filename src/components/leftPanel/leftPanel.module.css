@@ -19,7 +19,8 @@ h3 {
 
 .graphContainer {
     margin-bottom: 20px;
-    /* height: 500px; */
+    height: 300px;
+    width: 100%;
 }
 
 .metricsStrip {

@@ -45,13 +45,31 @@ export const LeftPanel = () => {
     responsive: true,
     maintainAspectRatio: false,
     animation: false,
-    elements: { point: { radius: 0 } },
+    elements: { 
+      point: { radius: 0 },
+      line: { tension: 0.1 }
+    },
     plugins: {
-      legend: { display: true, position: 'top' },
+      legend: { 
+        display: true, 
+        position: 'top',
+        labels: { boxWidth: 12, font: { size: 11 } }
+      },
+      tooltip: { enabled: true }
     },
     scales: {
-      x: { type: 'linear', title: { display: true, text: 'Sample index (n)' } },
-      y: { title: { display: true, text: title } }
+      x: { 
+        type: 'linear', 
+        title: { display: true, text: 'Sample index (n)', font: { size: 12 } },
+        ticks: { font: { size: 10 } },
+        grid: { display: false }
+      },
+      y: { 
+        beginAtZero: true,
+        title: { display: true, text: title, font: { size: 12 } },
+        ticks: { font: { size: 10 } },
+        grid: { color: '#f0f0f0' }
+      }
     }
   });
 
@@ -68,14 +86,16 @@ export const LeftPanel = () => {
 
   // Chart 1: Error Power Data
   const errorPowerChartData = useMemo(() => {
-    const lmsPeData = lmsResult?.Pe.map((v, i) => ({ x: i, y: v })) || [];
-    const rlsPeData = rlsResult?.Pe.map((v, i) => ({ x: i, y: v })) || [];
+    if (!currentSignal.length) return { datasets: [] };
+
+    const lmsPeData = lmsResult?.Pe.map((v, i) => ({ x: i, y: v || 0 })) || [];
+    const rlsPeData = rlsResult?.Pe.map((v, i) => ({ x: i, y: v || 0 })) || [];
     const thetaVal = (lmsResult?.theta || rlsResult?.theta) || 0;
-    const thetaData = currentSignal.map((_, i) => ({ x: i, y: thetaVal || null }));
+    const thetaData = currentSignal.map((_, i) => ({ x: i, y: thetaVal }));
 
     // Find max Y for vertical lines
-    const allY = [...lmsPeData.map(p => p.y), ...rlsPeData.map(p => p.y), thetaVal];
-    const maxY = Math.max(0.1, ...allY) * 1.1;
+    const allY = [...lmsPeData.map(p => p.y), ...rlsPeData.map(p => p.y), thetaVal].filter(v => !isNaN(v));
+    const maxY = (allY.length > 0 ? Math.max(0.1, ...allY) : 1) * 1.1;
 
     const datasets = [
       {
@@ -114,15 +134,17 @@ export const LeftPanel = () => {
   // Chart 2: Weight Trajectory Data
   const weightChartData = useMemo(() => {
     const activeResult = lastRun === 'RLS' ? rlsResult : lmsResult;
-    const w1Data = activeResult?.weightsHistory.map(h => ({ x: h.n, y: h.w[0] })) || [];
-    const w2Data = activeResult?.weightsHistory.map(h => ({ x: h.n, y: h.w[1] })) || [];
-    const w3Data = activeResult?.weightsHistory.map(h => ({ x: h.n, y: h.w[2] })) || [];
-    const w4Data = activeResult?.weightsHistory.map(h => ({ x: h.n, y: h.w[3] })) || [];
+    if (!activeResult?.weightsHistory.length) return { datasets: [] };
+
+    const w1Data = activeResult.weightsHistory.map(h => ({ x: h.n, y: h.w[0] }));
+    const w2Data = activeResult.weightsHistory.map(h => ({ x: h.n, y: h.w[1] }));
+    const w3Data = activeResult.weightsHistory.map(h => ({ x: h.n, y: h.w[2] }));
+    const w4Data = activeResult.weightsHistory.map(h => ({ x: h.n, y: h.w[3] }));
 
     // Find max/min Y for vertical lines
-    const allY = [...w1Data.map(p => p.y), ...w2Data.map(p => p.y), ...w3Data.map(p => p.y), ...w4Data.map(p => p.y)];
-    const maxY = Math.max(0.1, ...allY) * 1.1;
-    const minY = Math.min(0, ...allY) * 1.1;
+    const allY = [...w1Data.map(p => p.y), ...w2Data.map(p => p.y), ...w3Data.map(p => p.y), ...w4Data.map(p => p.y)].filter(v => !isNaN(v));
+    const maxY = (allY.length > 0 ? Math.max(0.1, ...allY) : 1) * 1.1;
+    const minY = (allY.length > 0 ? Math.min(0, ...allY) : -0.1) * 1.1;
 
     const datasets = [
       { label: "w₁", data: w1Data, borderColor: "#7F77DD", borderWidth: 2 },
@@ -149,8 +171,11 @@ export const LeftPanel = () => {
 
   // Chart 3: RLS Trace Data
   const traceChartData = useMemo(() => {
-    const tData = rlsResult?.traceP.map((v, i) => ({ x: i, y: v })) || [];
-    const maxY = Math.max(0.1, ...tData.map(p => p.y)) * 1.1;
+    if (!rlsResult?.traceP.length) return { datasets: [] };
+
+    const tData = rlsResult.traceP.map((v, i) => ({ x: i, y: v }));
+    const allY = tData.map(p => p.y).filter(v => !isNaN(v));
+    const maxY = (allY.length > 0 ? Math.max(0.1, ...allY) : 1) * 1.1;
 
     const datasets = [
       {
@@ -222,7 +247,7 @@ export const LeftPanel = () => {
         {/* New Chart 1: Error Power */}
         <div className={styles.chartCard}>
           <h3>Error Power Pₑ(n) — Non-Stationarity Detection</h3>
-          <div style={{ height: '250px' }}>
+          <div className={styles.graphContainer}>
             <Line data={errorPowerChartData} options={getCommonOptions('Error power')} />
           </div>
         </div>
@@ -230,7 +255,7 @@ export const LeftPanel = () => {
         {/* New Chart 2: Weight Trajectory */}
         <div className={styles.chartCard}>
           <h3>Weight Vector Trajectory w(n)</h3>
-          <div style={{ height: '250px' }}>
+          <div className={styles.graphContainer}>
             <Line data={weightChartData} options={getCommonOptions('Weight value')} />
           </div>
         </div>
@@ -239,7 +264,7 @@ export const LeftPanel = () => {
         {rlsResult && (
           <div className={styles.chartCard}>
             <h3>RLS Matrix Trace tr(P(n)) — Uncertainty Indicator</h3>
-            <div style={{ height: '250px' }}>
+            <div className={styles.graphContainer}>
               <Line data={traceChartData} options={getCommonOptions('tr(P(n))')} />
             </div>
             <div style={{ textAlign: 'center', fontSize: '0.8rem', color: '#666', marginTop: '10px' }}>

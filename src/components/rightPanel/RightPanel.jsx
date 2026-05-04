@@ -15,10 +15,13 @@ export const RightPanel = () => {
     wanderAmp, setWanderAmp,
     noiseStd, setNoiseStd,
     handleInject,
+    handleRestore,
     handleRunLMS, handleRunRLS,
     setGenerateECG,
     noise, setNoise,
     setApplyNoiseTrigger,
+    csvFileName, setCsvFileName,
+    useSynthetic, setUseSynthetic,
   } = useContext(SimulationContext);
 
   const currentStep = steps[step];
@@ -44,12 +47,22 @@ export const RightPanel = () => {
         {/* Card 1: Signal Setup */}
         <div className={`${styles.box} ${isFaded("generateButton") ? styles.faded : ""} ${isHighlighted("generateButton") ? styles.highlight : ""}`}>
           <h3>Signal Setup</h3>
-          <label>Select Dataset</label>
-          <select>
-            <option>Dataset 1</option>
-            <option>Dataset 2</option>
-            <option>Dataset 3</option>
+          <label>Source Type</label>
+          <select value={useSynthetic ? "synthetic" : "csv"} onChange={(e) => setUseSynthetic(e.target.value === "synthetic")}>
+            <option value="csv">Real ECG Datasets</option>
+            <option value="synthetic">Synthetic AR Process</option>
           </select>
+
+          {!useSynthetic && (
+            <>
+              <label>Select Dataset</label>
+              <select value={csvFileName} onChange={(e) => setCsvFileName(e.target.value)}>
+                <option value="ecg100.csv">ecg100.csv</option>
+                <option value="ecg200.csv">ecg200.csv</option>
+                <option value="ecg300.csv">ecg300.csv</option>
+              </select>
+            </>
+          )}
 
           <label>Duration: {time}s</label>
           <input type="range" min="2" max="10" value={time} onChange={(e) => setTime(Number(e.target.value))} />
@@ -103,12 +116,6 @@ export const RightPanel = () => {
           <div style={{ display: 'flex', gap: '5px', marginTop: '15px' }}>
             <button className={styles.tealButton} onClick={handleRunLMS}>Run LMS Predictor</button>
             <button className={styles.tealButton} onClick={handleRunRLS}>Run RLS Predictor</button>
-            <button className={styles.tealButton} onClick={() => { handleRunLMS(); handleRunRLS(); }}>Compare Both</button>
-          </div>
-          
-          <div style={{ marginTop: '10px' }}>
-            <button>Apply Filter</button>
-            <button>Compute PSD</button>
           </div>
         </div>
 
@@ -138,7 +145,10 @@ export const RightPanel = () => {
           <label>Noise Std (0.05–0.4): {noiseStd}</label>
           <input type="range" min="0.05" max="0.4" step="0.01" value={noiseStd} onChange={(e) => setNoiseStd(Number(e.target.value))} />
 
-          <button className={styles.tealButton} onClick={handleInject}>Inject Change-point</button>
+          <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
+            <button className={styles.tealButton} onClick={handleInject}>Inject Change-point</button>
+            <button onClick={handleRestore}>Restore Original</button>
+          </div>
         </div>
       </div>
     </div>
