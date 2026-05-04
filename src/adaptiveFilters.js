@@ -106,20 +106,23 @@ export function injectChangePoint(originalSignal, changePoint, type, wanderAmp, 
 
   if (type === 'ar' || type === 'all') {
     // shift AR structure in segment 2 by adding correlated perturbation
-    const ar2 = [1.1, -0.55, 0.18];
+    // We increase the gain and perturbation for visibility
+    const ar2 = [1.2, -0.6, 0.2];
     for (let n = changePoint + 3; n < N; n++) {
-      let v = noiseStd * (Math.random() * 2 - 1);
+      let v = noiseStd * 5 * (Math.random() * 2 - 1); // Increased noise factor
       for (let k = 0; k < 3; k++) v += ar2[k] * (sig[n - 1 - k] - originalSignal[n - 1 - k]);
-      sig[n] += 0.4 * v;
+      sig[n] += 0.8 * v; // Increased coupling
     }
   }
   if (type === 'wander' || type === 'all') {
+    // More aggressive baseline wander
     for (let n = changePoint; n < N; n++)
-      sig[n] += wanderAmp * Math.sin(2 * Math.PI * 0.15 * (n - changePoint) / fs);
+      sig[n] += wanderAmp * 2 * Math.sin(2 * Math.PI * 0.2 * (n - changePoint) / fs);
   }
   if (type === 'variance' || type === 'all') {
+    // Higher variance jump
     for (let n = changePoint; n < N; n++)
-      sig[n] += noiseStd * 2.5 * (Math.random() * 2 - 1);
+      sig[n] += noiseStd * 5 * (Math.random() * 2 - 1);
   }
   return sig;
 }
