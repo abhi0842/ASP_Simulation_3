@@ -194,9 +194,17 @@ export const SimulationProvider = ({ children }) => {
     setCurrentSignal(injectedY);
     setInjected(true);
     setQuizSubmitted(false);
-    // Clear previous results as they are no longer valid for the new signal
-    setLmsResult(null);
-    setRlsResult(null);
+
+    // Re-run predictors if they were already active to show the effect of the change immediately
+    if (lmsResult) {
+      const res = runLMS(injectedY, config.filterOrder, config.stepSize, config.windowLength, config.thresholdK);
+      setLmsResult(res);
+    }
+    if (rlsResult) {
+      const res = runRLS(injectedY, config.filterOrder, config.forgettingFactor, config.regularization, config.windowLength, config.thresholdK);
+      setRlsResult(res);
+    }
+
     markAction("INJECT_CHANGE");
   };
 

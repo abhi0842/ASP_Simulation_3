@@ -100,30 +100,34 @@ export function runRLS(signal, M, lambda, delta, L, K) {
   return { errors: Array.from(errors), Pe: Array.from(Pe), traceP: Array.from(traceP), weightsHistory, theta, detectedAt, peakTrace };
 }
 
+// Simple deterministic pseudo-random generator to keep injection consistent
+function deterministicRandom(n) {
+  const x = Math.sin(n) * 10000;
+  return (x - Math.floor(x)) * 2 - 1; // Returns value between -1 and 1
+}
+
 export function injectChangePoint(originalSignal, changePoint, type, wanderAmp, noiseStd, fs) {
   const N = originalSignal.length;
   const sig = [...originalSignal];
 
   if (type === 'ar' || type === 'all') {
     // shift AR structure in segment 2 by adding correlated perturbation
-    // We increase the gain and perturbation for visibility
-    const ar2 = [1.2, -0.6, 0.2];
+    const ar2 = [1.5, -0.8, 0.3]; 
     for (let n = changePoint + 3; n < N; n++) {
-      let v = noiseStd * 5 * (Math.random() * 2 - 1); // Increased noise factor
+      // Use deterministic random based on index n
+      let v = noiseStd * 10 * deterministicRandom(n); 
       for (let k = 0; k < 3; k++) v += ar2[k] * (sig[n - 1 - k] - originalSignal[n - 1 - k]);
-      sig[n] += 0.8 * v; // Increased coupling
+      sig[n] += 1.2 * v; 
     }
   }
   if (type === 'wander' || type === 'all') {
-    // More aggressive baseline wander
     const wanderFs = fs || 500;
     for (let n = changePoint; n < N; n++)
-      sig[n] += wanderAmp * 4 * Math.sin(2 * Math.PI * 0.5 * (n - changePoint) / wanderFs);
+      sig[n] += wanderAmp * 6 * Math.sin(2 * Math.PI * 0.3 * (n - changePoint) / wanderFs);
   }
   if (type === 'variance' || type === 'all') {
-    // Higher variance jump
     for (let n = changePoint; n < N; n++)
-      sig[n] += noiseStd * 8 * (Math.random() * 2 - 1);
+      sig[n] += noiseStd * 12 * deterministicRandom(n + N); // Offset index for different noise pattern
   }
   return sig;
 }

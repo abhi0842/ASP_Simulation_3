@@ -41,7 +41,7 @@ function inferFs(dataAll) {
 }
 
 export const EcgUnfilter = () => {
-  const { time, originalFs, setGenerateSignal, rawSamples, currentSignal } =
+  const { time, originalFs, setGenerateSignal, rawSamples, currentSignal, changePoint, injected } =
     useContext(SimulationContext);
 
   const data = useMemo(() => {
@@ -65,13 +65,30 @@ export const EcgUnfilter = () => {
         label: "ECG Signal",
         data,
         borderColor: "#0078d4",
-
         borderWidth: 1,
         pointRadius: 0,
         tension: 0,
       },
     ],
   };
+
+  if (injected) {
+    const cpTime = changePoint / originalFs;
+    // Find min/max for vertical line
+    const yValues = data.map(p => p.y);
+    const minY = Math.min(...yValues, -0.5);
+    const maxY = Math.max(...yValues, 0.5);
+
+    chartData.datasets.push({
+      label: "Change Point",
+      data: [{ x: cpTime, y: minY }, { x: cpTime, y: maxY }],
+      borderColor: "red",
+      borderWidth: 2,
+      borderDash: [5, 5],
+      pointRadius: 0,
+      showLine: true,
+    });
+  }
 
   const options = {
     responsive: true,

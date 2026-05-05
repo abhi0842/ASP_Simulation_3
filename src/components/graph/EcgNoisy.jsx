@@ -57,6 +57,7 @@ export const EcgNoisy = () => {
     currentSignal,
     setNoisySamples,
     injected,
+    changePoint,
   } = useContext(SimulationContext);
 
   // toggle when all noise is false
@@ -118,6 +119,24 @@ export const EcgNoisy = () => {
       },
     ],
   };
+
+  if (injected) {
+    const cpTime = changePoint / originalFs;
+    // Find min/max for vertical line
+    const yValues = data.map(p => p.y);
+    const minY = Math.min(...yValues, -0.5);
+    const maxY = Math.max(...yValues, 0.5);
+
+    chartData.datasets.push({
+      label: "Change Point",
+      data: [{ x: cpTime, y: minY }, { x: cpTime, y: maxY }],
+      borderColor: "blue", // Use blue for variety
+      borderWidth: 2,
+      borderDash: [5, 5],
+      pointRadius: 0,
+      showLine: true,
+    });
+  }
 
   const options = {
     responsive: true,
