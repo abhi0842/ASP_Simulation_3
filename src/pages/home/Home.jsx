@@ -5,6 +5,7 @@ import { Instruction } from "../../components/instruction/Instruction.jsx";
 import { SimulationContext } from "../../context/SimulationContext.jsx";
 import { LeftPanel } from "../../components/leftPanel/LeftPanel.jsx";
 import { RightPanel } from "../../components/rightPanel/RightPanel.jsx";
+import { GuidedModal } from "../../components/guidedModal/GuidedModal.jsx";
 
 export const Home = () => {
   const { showInstruction, setShowInstruction, buttonRef } =

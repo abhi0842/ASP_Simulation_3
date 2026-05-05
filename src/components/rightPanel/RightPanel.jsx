@@ -68,7 +68,12 @@ export const RightPanel = () => {
           <input type="range" min="2" max="10" value={time} onChange={(e) => setTime(Number(e.target.value))} />
           
           <label>Sampling Rate: 500 Hz</label>
-          <button onClick={() => { setGenerateECG(true); markAction("GENERATE_SIGNAL"); }}>Generate ECG Signal</button>
+          <button 
+            id="generateButton"
+            onClick={() => { setGenerateECG(true); markAction("GENERATE_SIGNAL"); }}
+          >
+            Generate ECG Signal
+          </button>
         </div>
 
         {/* Card 2: Add Noise */}
@@ -86,7 +91,11 @@ export const RightPanel = () => {
         <div className={`${styles.box} ${isFaded("algorithmSelector") ? styles.faded : ""} ${isHighlighted("algorithmSelector") ? styles.highlight : ""}`}>
           <h3>Adaptive Filter (NLMS / LMS / RLS)</h3>
           <label>Algorithm</label>
-          <select value={config.filterType} onChange={(e) => handleAlgoChange(e.target.value)}>
+          <select 
+            id="algorithmSelector"
+            value={config.filterType} 
+            onChange={(e) => handleAlgoChange(e.target.value)}
+          >
             <option value="LMS">LMS</option>
             <option value="RLS">RLS</option>
           </select>
@@ -114,7 +123,7 @@ export const RightPanel = () => {
           )}
 
           <div style={{ display: 'flex', gap: '5px', marginTop: '15px' }}>
-            <button className={styles.tealButton} onClick={handleRunLMS}>Run LMS Predictor</button>
+            <button id="runButton" className={styles.tealButton} onClick={handleRunLMS}>Run LMS Predictor</button>
             <button className={styles.tealButton} onClick={handleRunRLS}>Run RLS Predictor</button>
           </div>
         </div>
@@ -146,7 +155,7 @@ export const RightPanel = () => {
           <input type="range" min="0.05" max="0.4" step="0.01" value={noiseStd} onChange={(e) => setNoiseStd(Number(e.target.value))} />
 
           <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
-            <button className={styles.tealButton} onClick={handleInject}>Inject Change-point</button>
+            <button id="injectButton" className={styles.tealButton} onClick={handleInject}>Inject Change-point</button>
             <button onClick={handleRestore}>Restore Original</button>
           </div>
         </div>

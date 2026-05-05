@@ -71,55 +71,65 @@ export const SimulationProvider = ({ children }) => {
   const [step, setStep] = useState(0);
   const [actions, setActions] = useState({});
 
+  useEffect(() => {
+    // Show welcome modal on initial load
+    setGuideActive(true);
+  }, []);
+
   const markAction = (action) => {
     setActions((prev) => ({ ...prev, [action]: true }));
   };
 
   const steps = [
     {
-      title: "Non-Stationarity Lab",
-      content: "Learn how filters detect signal changes. Click Next to start.",
+      title: "Welcome to Simulation",
+      content: "Would you like assistance from the Guided Tutor Mode?",
+      type: "welcome",
+      targetId: "guideButton", // We'll add this ID to the button
     },
     {
-      title: "Step 1: Generate Signal",
-      content: "Click Generate Signal to create a stochastic process.",
+      title: "Signal Setup",
+      content: "Click Generate Signal to create an ECG process.",
       highlight: "generateButton",
       requiredAction: "GENERATE_SIGNAL",
+      position: "left",
     },
     {
-      title: "Step 2: Change Type",
-      content: "Select the type of non-stationarity (e.g., Structural).",
-      highlight: "signalTypeSelector",
-    },
-    {
-      title: "Step 3: Algorithm",
-      content: "Choose LMS or RLS.",
+      title: "Select Algorithm",
+      content: "Choose LMS or RLS to start filtering.",
       highlight: "algorithmSelector",
       requiredAction: "SELECT_ALGO",
+      position: "left",
     },
     {
-      title: "Step 4: Run",
-      content: "Run simulation to see adaptation.",
+      title: "Run Simulation",
+      content: "Click Run to observe adaptive learning.",
       highlight: "runButton",
       requiredAction: "RUN_SIMULATION",
+      position: "left",
     },
     {
-      title: "Step 5: Error Spike",
-      content: "Observe the Error Spike at the change-point — it reveals WHEN the change occurred.",
+      title: "Inject Change",
+      content: "Inject a change-point to test adaptation.",
+      highlight: "injectButton",
+      requiredAction: "INJECT_CHANGE",
+      position: "left",
+    },
+    {
+      title: "Observe Error",
+      content: "Notice the error spike at the change-point.",
       highlight: "errorGraph",
+      position: "above",
     },
     {
-      title: "Step 6: Weight Drift",
-      content: "Check Weight Trajectory to see how the model updated — it reveals WHAT changed.",
+      title: "Weight Drift",
+      content: "See how model weights update after change.",
       highlight: "weightsGraph",
+      position: "above",
     },
     {
-      title: "Step 7: Matrix Trace",
-      content: "For RLS, notice the surge in tr(P) at the change-point, indicating rapid learning.",
-    },
-    {
-      title: "Completed",
-      content: "Experiment finished!",
+      title: "Lab Completed",
+      content: "Great job! You've mastered non-stationarity.",
     },
   ];
 

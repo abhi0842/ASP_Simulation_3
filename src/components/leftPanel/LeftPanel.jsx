@@ -245,7 +245,7 @@ export const LeftPanel = () => {
         </div>
 
         {/* New Chart 1: Error Power */}
-        <div className={styles.chartCard}>
+        <div id="errorGraph" className={styles.chartCard}>
           <h3>Error Power Pₑ(n) — Non-Stationarity Detection</h3>
           <div className={styles.graphContainer}>
             <Line data={errorPowerChartData} options={getCommonOptions('Error power')} />
@@ -253,7 +253,7 @@ export const LeftPanel = () => {
         </div>
 
         {/* New Chart 2: Weight Trajectory */}
-        <div className={styles.chartCard}>
+        <div id="weightsGraph" className={styles.chartCard}>
           <h3>Weight Vector Trajectory w(n)</h3>
           <div className={styles.graphContainer}>
             <Line data={weightChartData} options={getCommonOptions('Weight value')} />

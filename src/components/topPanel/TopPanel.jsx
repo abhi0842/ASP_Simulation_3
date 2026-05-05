@@ -4,7 +4,8 @@ import { SimulationContext } from "../../context/SimulationContext.jsx";
 const TopPanel = () => {
   const { 
     showInstruction, setShowInstruction, buttonRef,
-    quizMode, setQuizMode
+    quizMode, setQuizMode,
+    guideActive, setGuideActive
   } = useContext(SimulationContext);  
 
   const toggleInstruction = () => {
@@ -15,6 +16,10 @@ const TopPanel = () => {
     setQuizMode(!quizMode);
   }
 
+  const toggleGuide = () => {
+    setGuideActive(!guideActive);
+  }
+
   return (
     <div className={styles.Container}>
       <div className={styles.panelContainer}>
@@ -23,9 +28,18 @@ const TopPanel = () => {
         </h1>
         <div className={styles.buttonContainer}>
           <button
+            id="guideButton"
+            className={styles.panelButton}
+            onClick={toggleGuide}
+            style={{ marginRight: '190px', backgroundColor: guideActive ? '#2ecc71' : '' }}
+          >
+            <span className={styles.buttonIcon}>🚀</span>
+            Guided Tutor
+          </button>
+          <button
             className={styles.panelButton}
             onClick={toggleQuizMode}
-            style={{ marginRight: '10px', backgroundColor: quizMode ? '#f1c40f' : '' }}
+            style={{ marginRight: '100px', backgroundColor: quizMode ? '#f1c40f' : '' }}
           >
             <span className={styles.buttonIcon}>🎓</span>
             Quiz Mode
