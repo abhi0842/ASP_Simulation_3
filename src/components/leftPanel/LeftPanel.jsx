@@ -24,11 +24,6 @@ export const LeftPanel = () => {
     rlsResult,
     changePoint,
     config,
-    quizMode,
-    quizGuess,
-    setQuizGuess,
-    quizSubmitted,
-    setQuizSubmitted,
   } = useContext(SimulationContext);
 
   const [lastRun, setLastRun] = useState(null); // 'LMS' or 'RLS'
@@ -37,8 +32,6 @@ export const LeftPanel = () => {
     if (rlsResult) setLastRun('RLS');
     else if (lmsResult) setLastRun('LMS');
   }, [lmsResult, rlsResult]);
-
-  const quizError = quizSubmitted ? Math.abs(Number(quizGuess) - changePoint) : null;
 
   // Common options for Chart.js
   const getCommonOptions = (title) => ({
@@ -81,7 +74,6 @@ export const LeftPanel = () => {
     borderDash: dashed ? [6, 3] : [],
     pointRadius: 0,
     showLine: true,
-    hidden: quizMode && !quizSubmitted
   });
 
   // Chart 1: Error Power Data
@@ -122,14 +114,12 @@ export const LeftPanel = () => {
       }
     ];
 
-    if (!quizMode || quizSubmitted) {
-      datasets.push(getVerticalLineDataset(changePoint, 'red', 'n*', maxY));
-      if (lmsResult?.detectedAt > 0) datasets.push(getVerticalLineDataset(lmsResult.detectedAt, '#378ADD', 'LMS detect', maxY, false));
-      if (rlsResult?.detectedAt > 0) datasets.push(getVerticalLineDataset(rlsResult.detectedAt, '#2a9d4e', 'RLS detect', maxY, false));
-    }
+    datasets.push(getVerticalLineDataset(changePoint, 'red', 'n*', maxY));
+    if (lmsResult?.detectedAt > 0) datasets.push(getVerticalLineDataset(lmsResult.detectedAt, '#378ADD', 'LMS detect', maxY, false));
+    if (rlsResult?.detectedAt > 0) datasets.push(getVerticalLineDataset(rlsResult.detectedAt, '#2a9d4e', 'RLS detect', maxY, false));
 
     return { datasets };
-  }, [lmsResult, rlsResult, currentSignal, changePoint, quizMode, quizSubmitted]);
+  }, [lmsResult, rlsResult, currentSignal, changePoint]);
 
   // Chart 2: Weight Trajectory Data
   const weightChartData = useMemo(() => {
@@ -153,21 +143,18 @@ export const LeftPanel = () => {
       { label: "w₄", data: w4Data, borderColor: "#378ADD", borderWidth: 2 }
     ];
 
-    if (!quizMode || quizSubmitted) {
-      datasets.push({
-        label: 'n*',
-        data: [{ x: changePoint, y: minY }, { x: changePoint, y: maxY }],
-        borderColor: 'red',
-        borderWidth: 2,
-        borderDash: [6, 3],
-        pointRadius: 0,
-        showLine: true,
-        hidden: quizMode && !quizSubmitted
-      });
-    }
+    datasets.push({
+      label: 'n*',
+      data: [{ x: changePoint, y: minY }, { x: changePoint, y: maxY }],
+      borderColor: 'red',
+      borderWidth: 2,
+      borderDash: [6, 3],
+      pointRadius: 0,
+      showLine: true,
+    });
 
     return { datasets };
-  }, [lmsResult, rlsResult, lastRun, changePoint, quizMode, quizSubmitted]);
+  }, [lmsResult, rlsResult, lastRun, changePoint]);
 
   // Chart 3: RLS Trace Data
   const traceChartData = useMemo(() => {
@@ -187,12 +174,10 @@ export const LeftPanel = () => {
       }
     ];
 
-    if (!quizMode || quizSubmitted) {
-      datasets.push(getVerticalLineDataset(changePoint, 'red', 'n*', maxY));
-    }
+    datasets.push(getVerticalLineDataset(changePoint, 'red', 'n*', maxY));
 
     return { datasets };
-  }, [rlsResult, changePoint, quizMode, quizSubmitted]);
+  }, [rlsResult, changePoint]);
 
   return (
     <div className={styles.leftPanelContainer}>
@@ -200,29 +185,6 @@ export const LeftPanel = () => {
         {/* Existing Charts */}
         <EcgUnfilter />
         <EcgNoisy />
-
-        {/* Quiz Mode Banner */}
-        {quizMode && (
-          <>
-            <div className={styles.quizBanner}>
-              Quiz Mode Active — Identify the change-point from the error power curve. Enter your answer below.
-            </div>
-            <div className={styles.quizInputRow}>
-              <input 
-                type="number" 
-                placeholder="sample index" 
-                value={quizGuess}
-                onChange={(e) => setQuizGuess(e.target.value)}
-              />
-              <button onClick={() => setQuizSubmitted(true)}>Submit Answer</button>
-            </div>
-            {quizSubmitted && (
-              <div className={`${styles.quizResult} ${quizError < 30 ? styles.success : styles.error}`}>
-                Your guess: {quizGuess}. Actual: {changePoint}. Error: {quizError} samples.
-              </div>
-            )}
-          </>
-        )}
 
         {/* Metrics Strip */}
         <div className={styles.metricsStrip}>

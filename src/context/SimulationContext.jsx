@@ -29,11 +29,6 @@ export const SimulationProvider = ({ children }) => {
   const [noiseStd, setNoiseStd] = useState(0.12);
   const [injected, setInjected] = useState(false);
 
-  // Quiz mode state
-  const [quizMode, setQuizMode] = useState(false);
-  const [quizGuess, setQuizGuess] = useState("");
-  const [quizSubmitted, setQuizSubmitted] = useState(false);
-
   // Adaptive filter params
   const [config, setConfig] = useState({
     filterType: "LMS",
@@ -83,53 +78,55 @@ export const SimulationProvider = ({ children }) => {
   const steps = [
     {
       title: "Welcome to Simulation",
-      content: "Would you like assistance from the Guided Tutor Mode?",
+      content: "Would you like help with this lab?",
       type: "welcome",
-      targetId: "guideButton", // We'll add this ID to the button
+      targetId: "guideButton",
+      preferredPlacement: "bottom",
     },
     {
-      title: "Signal Setup",
-      content: "Click Generate Signal to create an ECG process.",
+      title: "1. Generate Signal",
+      content: "Click to create a stochastic ECG process.",
       highlight: "generateButton",
       requiredAction: "GENERATE_SIGNAL",
-      position: "left",
+      preferredPlacement: "left",
     },
     {
-      title: "Select Algorithm",
-      content: "Choose LMS or RLS to start filtering.",
+      title: "2. Select Algorithm",
+      content: "Choose LMS or RLS to start.",
       highlight: "algorithmSelector",
       requiredAction: "SELECT_ALGO",
-      position: "left",
+      preferredPlacement: "left",
     },
     {
-      title: "Run Simulation",
-      content: "Click Run to observe adaptive learning.",
+      title: "3. Run Predictor",
+      content: "Observe the adaptive filter learning.",
       highlight: "runButton",
       requiredAction: "RUN_SIMULATION",
-      position: "left",
+      preferredPlacement: "left",
     },
     {
-      title: "Inject Change",
-      content: "Inject a change-point to test adaptation.",
+      title: "4. Inject Change",
+      content: "Test the filter's adaptation to shifts.",
       highlight: "injectButton",
       requiredAction: "INJECT_CHANGE",
-      position: "left",
+      preferredPlacement: "left",
     },
     {
-      title: "Observe Error",
-      content: "Notice the error spike at the change-point.",
+      title: "5. Error Spike",
+      content: "The spike reveals WHEN the change occurred.",
       highlight: "errorGraph",
-      position: "above",
+      preferredPlacement: "top",
     },
     {
-      title: "Weight Drift",
-      content: "See how model weights update after change.",
+      title: "6. Weight Drift",
+      content: "The drift reveals WHAT changed in the model.",
       highlight: "weightsGraph",
-      position: "above",
+      preferredPlacement: "top",
     },
     {
       title: "Lab Completed",
-      content: "Great job! You've mastered non-stationarity.",
+      content: "You've mastered non-stationarity detection!",
+      preferredPlacement: "center",
     },
   ];
 
@@ -187,7 +184,6 @@ export const SimulationProvider = ({ children }) => {
     setLmsResult(null);
     setRlsResult(null);
     setInjected(false);
-    setQuizSubmitted(false);
     setChangePoint(Math.floor(length / 2));
   };
 
@@ -203,7 +199,6 @@ export const SimulationProvider = ({ children }) => {
     const injectedY = injectChangePoint(originalY, changePoint, injectionType, wanderAmp, noiseStd, originalFs);
     setCurrentSignal(injectedY);
     setInjected(true);
-    setQuizSubmitted(false);
 
     // Re-run predictors if they were already active to show the effect of the change immediately
     if (lmsResult) {
@@ -286,13 +281,6 @@ export const SimulationProvider = ({ children }) => {
         handleInject,
         handleRestore,
         injected,
-
-        quizMode,
-        setQuizMode,
-        quizGuess,
-        setQuizGuess,
-        quizSubmitted,
-        setQuizSubmitted,
 
         config,
         setConfig,

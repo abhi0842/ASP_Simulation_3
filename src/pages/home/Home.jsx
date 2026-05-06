@@ -51,6 +51,7 @@ export const Home = () => {
         <div className={styles.footerContainer}>
           ©Copyright 2025 Virtual Labs, IIT Roorkee
         </div>
+        <GuidedModal />
       </div>
     </div>
   );
