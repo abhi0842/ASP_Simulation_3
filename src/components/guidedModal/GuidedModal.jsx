@@ -3,121 +3,167 @@ import { SimulationContext } from "../../context/SimulationContext.jsx";
 import styles from "./guidedModal.module.css";
 
 export const GuidedModal = () => {
-  const { guideActive, setGuideActive, step, setStep, steps, canProceed } = useContext(SimulationContext);
+  const { 
+    guideActive, setGuideActive, step, setStep, steps, 
+    canProceed, setShowInstruction, showInstruction,
+    instructionPanelRef
+  } = useContext(SimulationContext);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [arrowStyle, setArrowStyle] = useState({});
   const [arrowClass, setArrowClass] = useState("");
   const modalRef = useRef(null);
-  const containerRef = useRef(null);
   
   const currentStep = steps[step];
 
-  useEffect(() => {
+  // Constants for UI Exclusion Zones
+  const TOP_PANEL_HEIGHT = 60;
+  const LEFT_PANEL_WIDTH = 280;
+
+  const updatePosition = () => {
     if (!guideActive || !currentStep) return;
 
-    const updatePosition = () => {
+    const modalWidth = 320;
+    const modalHeight = modalRef.current?.offsetHeight || 150;
+
+    // Special Case: Choice/Welcome Step (Centered)
+    if (currentStep.type === "choice") {
+      setPosition({
+        top: window.innerHeight / 2 - modalHeight / 2,
+        left: window.innerWidth / 2 - modalWidth / 2
+      });
+      setArrowClass("");
+      setArrowStyle({});
+      return;
+    }
+
+    let target = null;
+    if (currentStep.highlight === "instructionPanel" && instructionPanelRef.current) {
+      target = instructionPanelRef.current;
+    } else {
       const targetId = currentStep.highlight || currentStep.targetId;
-      const target = document.getElementById(targetId);
-      const container = modalRef.current?.parentElement;
-      
-      if (!target || !container) {
-        setPosition({ top: 100, left: 50 });
-        setArrowClass("");
-        setArrowStyle({});
-        return;
-      }
+      target = document.getElementById(targetId);
+    }
 
-      const rect = target.getBoundingClientRect();
-      const contRect = container.getBoundingClientRect();
-      const modalWidth = 320;
-      const modalHeight = modalRef.current?.offsetHeight || 150;
-      const OFFSET = 16;
+    const container = modalRef.current?.parentElement;
+    if (!target || !container) return;
 
-      // Smart side detection - calculate available space
-      const spaceRight = window.innerWidth - rect.right;
-      const spaceLeft = rect.left;
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
+    const rect = target.getBoundingClientRect();
+    const contRect = container.getBoundingClientRect();
+    if (rect.width === 0) return;
 
-      const preferredPlacement = currentStep.preferredPlacement || 'right';
-      let chosenSide = preferredPlacement;
+    const OFFSET = currentStep.isDropdown ? 24 : 16;
+    const isMobile = window.innerWidth < 768;
 
-      // Fallback to side with most space if preferred side is too cramped
-      if (preferredPlacement === 'right' && spaceRight < modalWidth + OFFSET) {
-        if (spaceLeft > spaceRight) chosenSide = 'left';
-      } else if (preferredPlacement === 'left' && spaceLeft < modalWidth + OFFSET) {
-        if (spaceRight > spaceLeft) chosenSide = 'right';
-      } else if (preferredPlacement === 'top' && spaceAbove < modalHeight + OFFSET) {
-        if (spaceBelow > spaceAbove) chosenSide = 'bottom';
-      } else if (preferredPlacement === 'bottom' && spaceBelow < modalHeight + OFFSET) {
-        if (spaceAbove > spaceBelow) chosenSide = 'top';
-      }
+    // Smart Side Detection
+    const spaceRight = window.innerWidth - rect.right;
+    const spaceLeft = rect.left;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
 
-      let top = 0;
-      let left = 0;
-      let arrowDir = "";
+    let chosenSide = isMobile ? 'bottom' : (currentStep.preferredPlacement || 'right');
 
-      // Positioning and arrow selection based on chosen side
-      if (chosenSide === 'right') {
-        left = rect.right + OFFSET;
-        top = rect.top + (rect.height / 2) - (modalHeight / 2);
-        arrowDir = styles.arrowLeft;
-      } else if (chosenSide === 'left') {
-        left = rect.left - modalWidth - OFFSET;
-        top = rect.top + (rect.height / 2) - (modalHeight / 2);
-        arrowDir = styles.arrowRight;
-      } else if (chosenSide === 'top') {
-        top = rect.top - modalHeight - OFFSET;
-        left = rect.left + (rect.width / 2) - (modalWidth / 2);
-        arrowDir = styles.arrowBottom;
-      } else if (chosenSide === 'bottom') {
-        top = rect.bottom + OFFSET;
-        left = rect.left + (rect.width / 2) - (modalWidth / 2);
-        arrowDir = styles.arrowTop;
-      } else if (chosenSide === 'center') {
-        left = window.innerWidth / 2 - modalWidth / 2;
-        top = window.innerHeight / 2 - modalHeight / 2;
-        arrowDir = "";
-      }
+    // Override for dropdowns
+    if (currentStep.isDropdown && !isMobile) {
+      chosenSide = spaceRight > spaceLeft ? 'right' : 'left';
+    }
 
-      // Convert to container-relative coordinates
-      top = top - contRect.top;
-      left = left - contRect.left;
-
-      // Viewport bounds check - clamp within container
-      const minLeft = 8;
-      const maxLeft = contRect.width - modalWidth - 8;
-      left = Math.max(minLeft, Math.min(left, maxLeft));
-      
-      const minTop = 8;
-      const maxTop = container.scrollHeight - modalHeight - 8;
-      top = Math.max(minTop, Math.min(top, maxTop));
-
-      // Accurate arrow pointer alignment
-      const targetRelCenterX = rect.left - contRect.left + (rect.width / 2);
-      const targetRelCenterY = rect.top - contRect.top + (rect.height / 2);
-
-      let aStyle = {};
-      if (arrowDir === styles.arrowLeft || arrowDir === styles.arrowRight) {
-        const arrowTopOffset = targetRelCenterY - top;
-        aStyle = { top: Math.max(15, Math.min(arrowTopOffset, modalHeight - 15)) };
-      } else if (arrowDir === styles.arrowTop || arrowDir === styles.arrowBottom) {
-        const arrowLeftOffset = targetRelCenterX - left;
-        aStyle = { left: Math.max(15, Math.min(arrowLeftOffset, modalWidth - 15)) };
-      }
-
-      setPosition({ top, left });
-      setArrowClass(arrowDir);
-      setArrowStyle(aStyle);
+    // Dynamic Space Check
+    const sides = {
+      right: spaceRight,
+      left: spaceLeft,
+      bottom: spaceBelow,
+      top: spaceAbove
     };
+    
+    if (chosenSide !== 'center') {
+      const requiredSpace = (chosenSide === 'left' || chosenSide === 'right') ? modalWidth + OFFSET : modalHeight + OFFSET;
+      if (sides[chosenSide] < requiredSpace) {
+        // Fallback to side with most space
+        chosenSide = Object.entries(sides).sort((a, b) => b[1] - a[1])[0][0];
+      }
+    }
 
-    updatePosition();
-    window.addEventListener("resize", updatePosition);
+    let top = 0;
+    let left = 0;
+    let arrowDir = "";
 
-    return () => {
-      window.removeEventListener("resize", updatePosition);
+    // Calculate Coordinates relative to Viewport
+    if (chosenSide === 'right') {
+      left = rect.right + OFFSET;
+      top = rect.top + rect.height / 2 - modalHeight / 2;
+      arrowDir = styles.arrowLeft;
+    } else if (chosenSide === 'left') {
+      left = rect.left - modalWidth - OFFSET;
+      top = rect.top + rect.height / 2 - modalHeight / 2;
+      arrowDir = styles.arrowRight;
+    } else if (chosenSide === 'top') {
+      top = rect.top - modalHeight - OFFSET;
+      left = rect.left + rect.width / 2 - modalWidth / 2;
+      arrowDir = styles.arrowBottom;
+    } else if (chosenSide === 'bottom') {
+      top = rect.bottom + OFFSET;
+      left = rect.left + rect.width / 2 - modalWidth / 2;
+      arrowDir = styles.arrowTop;
+    } else {
+      left = window.innerWidth / 2 - modalWidth / 2;
+      top = window.innerHeight / 2 - modalHeight / 2;
+      arrowDir = "";
+    }
+
+    // --- Collision & Exclusion Zones ---
+    if (top < TOP_PANEL_HEIGHT + 8) top = TOP_PANEL_HEIGHT + 8;
+    
+    // Convert to Container-Relative
+    top = top - contRect.top;
+    left = left - contRect.left;
+
+    // Final Viewport Clamping
+    const minL = 8;
+    const maxL = contRect.width - modalWidth - 8;
+    left = Math.max(minL, Math.min(left, maxL));
+    
+    const minT = 8;
+    const maxT = container.scrollHeight - modalHeight - 8;
+    top = Math.max(minT, Math.min(top, maxT));
+
+    // Arrow Precision Alignment
+    const targetRelCenterX = rect.left - contRect.left + (rect.width / 2);
+    const targetRelCenterY = rect.top - contRect.top + (rect.height / 2);
+
+    let aStyle = {};
+    if (arrowDir === styles.arrowLeft || arrowDir === styles.arrowRight) {
+      aStyle = { top: Math.max(15, Math.min(targetRelCenterY - top, modalHeight - 15)) };
+    } else if (arrowDir === styles.arrowTop || arrowDir === styles.arrowBottom) {
+      aStyle = { left: Math.max(15, Math.min(targetRelCenterX - left, modalWidth - 15)) };
+    }
+
+    setPosition({ top, left });
+    setArrowClass(arrowDir);
+    setArrowStyle(aStyle);
+  };
+
+  useEffect(() => {
+    let timeoutId = null;
+    const handleResize = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(updatePosition, 150);
     };
-  }, [guideActive, step, currentStep]);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [guideActive, step]);
+
+  useEffect(() => {
+    if (guideActive) {
+      if (currentStep?.highlight === "instructionPanel") {
+        if (showInstruction && instructionPanelRef.current) {
+          const rect = instructionPanelRef.current.getBoundingClientRect();
+          if (rect.width > 0) updatePosition();
+        }
+      } else {
+        updatePosition();
+      }
+    }
+  }, [guideActive, step, showInstruction]);
 
   if (!guideActive || !currentStep) return null;
 
@@ -131,46 +177,62 @@ export const GuidedModal = () => {
     setStep((prev) => Math.max(0, prev - 1));
   };
 
-  const handleClose = () => {
+  const handleYes = () => {
+    setShowInstruction(true);
+    setTimeout(() => {
+      setStep(1);
+    }, 400);
+  };
+
+  const handleSkip = () => {
     setGuideActive(false);
+    setShowInstruction(false);
     setStep(0);
   };
 
-  const isWelcome = currentStep.type === "welcome";
+  const isChoice = currentStep.type === "choice";
 
   return (
     <div 
       className={styles.modalOverlay} 
-      style={{ top: position.top, left: position.left }}
+      style={{ 
+        top: position.top, 
+        left: position.left,
+        opacity: guideActive ? 1 : 0,
+        pointerEvents: guideActive ? 'auto' : 'none'
+      }}
       ref={modalRef}
     >
       <div className={styles.modal}>
-        <div className={`${styles.arrow} ${arrowClass}`} style={arrowStyle} />
-        <button className={styles.closeIcon} onClick={handleClose} aria-label="Close">×</button>
+        {arrowClass && <div className={`${styles.arrow} ${arrowClass}`} style={arrowStyle} />}
+        <button className={styles.closeIcon} onClick={handleSkip} aria-label="Close">×</button>
         <h2>{currentStep.title}</h2>
         <p>{currentStep.content}</p>
         <div className={styles.footer}>
-          {isWelcome ? (
+          {isChoice ? (
             <div className={styles.buttonGroup}>
-              <button className={styles.nextButton} onClick={handleNext}>Yes, Start</button>
-              <button className={styles.cancelButton} onClick={handleClose}>No, thanks</button>
+              <button className={styles.nextButton} onClick={handleYes}>Yes, show me</button>
+              <button className={styles.cancelButton} onClick={handleSkip}>Skip</button>
             </div>
           ) : (
             <div className={styles.buttonGroup}>
-              {step > 0 && (
-                <button className={styles.cancelButton} onClick={handleBack}>Back</button>
-              )}
-              {step < steps.length - 1 ? (
-                <button 
-                  className={styles.nextButton} 
-                  onClick={handleNext}
-                  disabled={!canProceed}
-                >
-                  {currentStep.requiredAction && !canProceed ? "Complete step..." : "Next"}
-                </button>
-              ) : (
-                <button className={styles.nextButton} onClick={handleClose}>Finish</button>
-              )}
+              <div className={styles.stepCounter}>Step {step} of {steps.length - 1}</div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {step > 1 && (
+                  <button className={styles.cancelButton} onClick={handleBack}>Back</button>
+                )}
+                {step < steps.length - 1 ? (
+                  <button 
+                    className={styles.nextButton} 
+                    onClick={handleNext}
+                    disabled={!canProceed}
+                  >
+                    {currentStep.requiredAction && !canProceed ? "Complete..." : "Next"}
+                  </button>
+                ) : (
+                  <button className={styles.nextButton} onClick={handleSkip}>Finish</button>
+                )}
+              </div>
             </div>
           )}
         </div>

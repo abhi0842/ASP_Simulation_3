@@ -1,4 +1,4 @@
-import { useMemo, useContext, useEffect } from "react";
+import { useMemo, useContext, useEffect, useState } from "react";
 import { SimulationContext } from "../../context/SimulationContext";
 import styles from "./ecgNoisy.module.css";
 
@@ -57,8 +57,26 @@ export const EcgNoisy = () => {
     currentSignal,
     setNoisySamples,
     injected,
+    injectedAt,
+    isSaturated,
     changePoint,
   } = useContext(SimulationContext);
+
+  // Force re-renders during flatline/ramp period
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (isSaturated && injectedAt) {
+      const timer = setInterval(() => {
+        const elapsed = Date.now() - injectedAt;
+        if (elapsed < 3500) {
+          setTick(t => t + 1);
+        } else {
+          clearInterval(timer);
+        }
+      }, 50);
+      return () => clearInterval(timer);
+    }
+  }, [isSaturated, injectedAt]);
 
   // toggle when all noise is false
   useEffect(() => {
@@ -79,7 +97,8 @@ export const EcgNoisy = () => {
 
     const fsOriginal = inferFs(mappedSamples);
     const displayData = resampleForDisplay(mappedSamples, fsOriginal, originalFs);
-    const limited = displayData.filter((p) => p.x <= time);
+    let limited = displayData.filter((p) => p.x <= time);
+
     // compute noise inline to avoid state setting in effect
     let y = limited.map((p) => p.y);
     if (noise.baseline) {
@@ -91,9 +110,37 @@ export const EcgNoisy = () => {
     if (noise.emg) {
       y = addMuscleNoise(y);
     }
-    //console.log("limited", limited, limited.map((p, i) => ({ x: p.x, y: y[i] })));
-    return limited.map((p, i) => ({ x: p.x, y: y[i] }));
-  }, [applyNoiseTrigger, noise, time, originalFs, rawSamples, currentSignal, injected]);
+
+    let finalData = limited.map((p, i) => ({ x: p.x, y: y[i] }));
+
+    // Part 3 — Inject Changes Flattens Noisy Signal
+    const FLATLINE_DURATION = 2000;
+    const RAMP_DURATION = 1000;
+    if (isSaturated && injectedAt) {
+      const elapsed = Date.now() - injectedAt;
+      if (elapsed < FLATLINE_DURATION + RAMP_DURATION) {
+        const cpIndex = changePoint;
+        const cpTime = cpIndex / originalFs;
+
+        finalData = finalData.map(p => {
+          if (p.x >= cpTime) {
+            // Noisy signal flattens because noise has nothing to modulate when base collapses
+            const lastNormalValue = y[limited.findIndex(lp => lp.x >= cpTime)] || 0;
+            if (elapsed < FLATLINE_DURATION) {
+              return { ...p, y: lastNormalValue };
+            } else {
+              const rampElapsed = elapsed - FLATLINE_DURATION;
+              const alpha = Math.min(1, rampElapsed / RAMP_DURATION);
+              return { ...p, y: lastNormalValue * (1 - alpha) + p.y * alpha };
+            }
+          }
+          return p;
+        });
+      }
+    }
+
+    return finalData;
+  }, [applyNoiseTrigger, noise, time, originalFs, rawSamples, currentSignal, injected, injectedAt, isSaturated, changePoint]);
 
   useEffect(() => {
     setNoisySamples(data);

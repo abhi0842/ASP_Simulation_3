@@ -1,0 +1,72 @@
+export const guideSteps = [
+  {
+    title: "Welcome to Simulation",
+    content: "Would you like a guided tour of the Non-Stationarity Detection Lab?",
+    type: "choice",
+    targetId: "guideButton",
+  },
+  {
+    title: "Instructions",
+    content: "Review the lab objectives and theoretical background here.",
+    highlight: "instructionPanel",
+    preferredPlacement: "right",
+  },
+  {
+    title: "1. Generate Signal",
+    content: "Click to create a stochastic ECG process for the experiment.",
+    highlight: "generateButton",
+    requiredAction: "GENERATE_SIGNAL",
+    preferredPlacement: "left",
+  },
+  {
+    title: "2. Add Noise",
+    content: "Select noise types and click 'Add Noise' to corrupt the signal.",
+    highlight: "noiseControlPanel",
+    preferredPlacement: "left",
+  },
+  {
+    title: "3. Select Algorithm",
+    content: "Choose LMS or RLS. LMS is simpler, RLS is faster but complex.",
+    highlight: "algorithmSelector",
+    requiredAction: "SELECT_ALGO",
+    preferredPlacement: "left",
+    isDropdown: true,
+  },
+  {
+    title: "4. Filter Parameters",
+    content: "Adjust Filter Order M and Step size µ to tune detection sensitivity.",
+    highlight: "filterParamsPanel",
+    preferredPlacement: "left",
+  },
+  {
+    title: "5. Run Predictor",
+    content: "Run the simulation to see the adaptive filter in action.",
+    highlight: "runButton",
+    requiredAction: "RUN_SIMULATION",
+    preferredPlacement: "left",
+  },
+  {
+    title: "6. Inject Change",
+    content: "Inject a non-stationarity to test if the filter can detect it.",
+    highlight: "injectButton",
+    requiredAction: "INJECT_CHANGE",
+    preferredPlacement: "left",
+  },
+  {
+    title: "7. Error Power",
+    content: "The spike in Pₑ(n) reveals WHEN the change occurred.",
+    highlight: "errorGraph",
+    preferredPlacement: "top",
+  },
+  {
+    title: "8. Weight Drift",
+    content: "The drift in w(n) reveals WHAT changed in the signal model.",
+    highlight: "weightsGraph",
+    preferredPlacement: "top",
+  },
+  {
+    title: "Lab Completed",
+    content: "Excellent! You've mastered non-stationarity detection. Feel free to explore more.",
+    preferredPlacement: "center",
+  },
+];

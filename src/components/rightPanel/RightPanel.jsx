@@ -77,7 +77,7 @@ export const RightPanel = () => {
         </div>
 
         {/* Card 2: Add Noise */}
-        <div className={styles.box}>
+        <div id="noiseControlPanel" className={styles.box}>
           <h3>Add Noise</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
             <label><input type="checkbox" checked={noise.baseline} onChange={() => handleNoiseToggle('baseline')} /> Baseline Wander</label>
@@ -88,7 +88,7 @@ export const RightPanel = () => {
         </div>
 
         {/* Card 3: Adaptive Filter */}
-        <div className={`${styles.box} ${isFaded("algorithmSelector") ? styles.faded : ""} ${isHighlighted("algorithmSelector") ? styles.highlight : ""}`}>
+        <div id="filterParamsPanel" className={`${styles.box} ${isFaded("algorithmSelector") ? styles.faded : ""} ${isHighlighted("algorithmSelector") ? styles.highlight : ""}`}>
           <h3>Adaptive Filter (NLMS / LMS / RLS)</h3>
           <label>Algorithm</label>
           <select 

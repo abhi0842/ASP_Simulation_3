@@ -3,6 +3,7 @@ import { createContext, useCallback, useEffect, useRef, useState } from "react";
 import Papa from "papaparse";
 import { generateStochasticSignal } from "../utils/filters";
 import { runLMS, runRLS, injectChangePoint } from "../adaptiveFilters";
+import { guideSteps } from "../guideSteps";
 
 export const SimulationContext = createContext();
 
@@ -28,6 +29,8 @@ export const SimulationProvider = ({ children }) => {
   const [wanderAmp, setWanderAmp] = useState(0.15);
   const [noiseStd, setNoiseStd] = useState(0.12);
   const [injected, setInjected] = useState(false);
+  const [injectedAt, setInjectedAt] = useState(null); // Time of injection for flatline effect
+  const [isSaturated, setIsSaturated] = useState(false);
 
   // Adaptive filter params
   const [config, setConfig] = useState({
@@ -56,6 +59,7 @@ export const SimulationProvider = ({ children }) => {
   // Instruction panel state / button ref used in Home.jsx
   const [showInstruction, setShowInstruction] = useState(false);
   const buttonRef = useRef(null);
+  const instructionPanelRef = useRef(null);
 
   // Dataset selection
   const [csvFileName, setCsvFileName] = useState("ecg100.csv");
@@ -66,69 +70,11 @@ export const SimulationProvider = ({ children }) => {
   const [step, setStep] = useState(0);
   const [actions, setActions] = useState({});
 
-  useEffect(() => {
-    // Show welcome modal on initial load
-    setGuideActive(true);
-  }, []);
-
   const markAction = (action) => {
     setActions((prev) => ({ ...prev, [action]: true }));
   };
 
-  const steps = [
-    {
-      title: "Welcome to Simulation",
-      content: "Would you like help with this lab?",
-      type: "welcome",
-      targetId: "guideButton",
-      preferredPlacement: "bottom",
-    },
-    {
-      title: "1. Generate Signal",
-      content: "Click to create a stochastic ECG process.",
-      highlight: "generateButton",
-      requiredAction: "GENERATE_SIGNAL",
-      preferredPlacement: "left",
-    },
-    {
-      title: "2. Select Algorithm",
-      content: "Choose LMS or RLS to start.",
-      highlight: "algorithmSelector",
-      requiredAction: "SELECT_ALGO",
-      preferredPlacement: "left",
-    },
-    {
-      title: "3. Run Predictor",
-      content: "Observe the adaptive filter learning.",
-      highlight: "runButton",
-      requiredAction: "RUN_SIMULATION",
-      preferredPlacement: "left",
-    },
-    {
-      title: "4. Inject Change",
-      content: "Test the filter's adaptation to shifts.",
-      highlight: "injectButton",
-      requiredAction: "INJECT_CHANGE",
-      preferredPlacement: "left",
-    },
-    {
-      title: "5. Error Spike",
-      content: "The spike reveals WHEN the change occurred.",
-      highlight: "errorGraph",
-      preferredPlacement: "top",
-    },
-    {
-      title: "6. Weight Drift",
-      content: "The drift reveals WHAT changed in the model.",
-      highlight: "weightsGraph",
-      preferredPlacement: "top",
-    },
-    {
-      title: "Lab Completed",
-      content: "You've mastered non-stationarity detection!",
-      preferredPlacement: "center",
-    },
-  ];
+  const steps = guideSteps;
 
   const currentStep = steps[step];
   const canProceed = !currentStep?.requiredAction || actions[currentStep.requiredAction];
@@ -194,11 +140,23 @@ export const SimulationProvider = ({ children }) => {
     }
   }, [generateECG, handleGenerateSignal]);
 
+  const injectTimerRef = useRef(null);
+
   const handleInject = () => {
     const originalY = rawSamples.map(s => s.y);
     const injectedY = injectChangePoint(originalY, changePoint, injectionType, wanderAmp, noiseStd, originalFs);
     setCurrentSignal(injectedY);
     setInjected(true);
+    setInjectedAt(Date.now()); // Set injection time for saturation effect
+    setIsSaturated(true);
+
+    // Clear previous timer if any
+    if (injectTimerRef.current) clearTimeout(injectTimerRef.current);
+    
+    // Part 3 point 13 — Explicitly reset saturation after 3 seconds (2s flat + 1s ramp)
+    injectTimerRef.current = setTimeout(() => {
+      setIsSaturated(false);
+    }, 3000);
 
     // Re-run predictors if they were already active to show the effect of the change immediately
     if (lmsResult) {
@@ -213,9 +171,17 @@ export const SimulationProvider = ({ children }) => {
     markAction("INJECT_CHANGE");
   };
 
+  useEffect(() => {
+    return () => {
+      if (injectTimerRef.current) clearTimeout(injectTimerRef.current);
+    };
+  }, []);
+
   const handleRestore = () => {
     setCurrentSignal(rawSamples.map(s => s.y));
     setInjected(false);
+    setIsSaturated(false);
+    if (injectTimerRef.current) clearTimeout(injectTimerRef.current);
     setLmsResult(null);
     setRlsResult(null);
   };
@@ -281,6 +247,8 @@ export const SimulationProvider = ({ children }) => {
         handleInject,
         handleRestore,
         injected,
+        injectedAt,
+        isSaturated,
 
         config,
         setConfig,
@@ -288,6 +256,7 @@ export const SimulationProvider = ({ children }) => {
         showInstruction,
         setShowInstruction,
         buttonRef,
+        instructionPanelRef,
 
         step,
         setStep,

@@ -1,4 +1,4 @@
-import { useMemo, useContext } from "react";
+import { useMemo, useContext, useEffect, useState } from "react";
 import { SimulationContext } from "../../context/SimulationContext";
 import styles from "./ecgUnfilter.module.css";
 import { Line } from "react-chartjs-2";
@@ -41,8 +41,24 @@ function inferFs(dataAll) {
 }
 
 export const EcgUnfilter = () => {
-  const { time, originalFs, setGenerateSignal, rawSamples, currentSignal, changePoint, injected } =
+  const { time, originalFs, setGenerateSignal, rawSamples, currentSignal, changePoint, injected, injectedAt, isSaturated } =
     useContext(SimulationContext);
+
+  // Force re-renders during flatline/ramp period
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (isSaturated && injectedAt) {
+      const timer = setInterval(() => {
+        const elapsed = Date.now() - injectedAt;
+        if (elapsed < 3500) { 
+          setTick(t => t + 1);
+        } else {
+          clearInterval(timer);
+        }
+      }, 50);
+      return () => clearInterval(timer);
+    }
+  }, [isSaturated, injectedAt]);
 
   const data = useMemo(() => {
     if (!rawSamples.length || !currentSignal.length) return [];
@@ -55,8 +71,36 @@ export const EcgUnfilter = () => {
 
     const fsOriginal = inferFs(mappedSamples);
     const displayData = resampleForDisplay(mappedSamples, fsOriginal, originalFs);
-    return displayData.filter((p) => p.x <= time);
-  }, [time, originalFs, rawSamples, currentSignal]);
+    let limited = displayData.filter((p) => p.x <= time);
+
+    // Part 3 — Inject Changes Flattens Unfiltered Data
+    const FLATLINE_DURATION = 2000;
+    const RAMP_DURATION = 1000;
+    if (isSaturated && injectedAt) {
+      const elapsed = Date.now() - injectedAt;
+      if (elapsed < FLATLINE_DURATION + RAMP_DURATION) {
+        const cpIndex = changePoint;
+        const cpTime = cpIndex / originalFs;
+        
+        limited = limited.map(p => {
+          if (p.x >= cpTime) {
+            const lastNormalValue = currentSignal[cpIndex] || 0;
+            if (elapsed < FLATLINE_DURATION) {
+              return { ...p, y: lastNormalValue };
+            } else {
+              // Gradual ramp back
+              const rampElapsed = elapsed - FLATLINE_DURATION;
+              const alpha = Math.min(1, rampElapsed / RAMP_DURATION);
+              return { ...p, y: lastNormalValue * (1 - alpha) + p.y * alpha };
+            }
+          }
+          return p;
+        });
+      }
+    }
+
+    return limited;
+  }, [time, originalFs, rawSamples, currentSignal, injected, injectedAt, isSaturated, changePoint]);
 
 
   const chartData = {

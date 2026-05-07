@@ -8,15 +8,14 @@ import { RightPanel } from "../../components/rightPanel/RightPanel.jsx";
 import { GuidedModal } from "../../components/guidedModal/GuidedModal.jsx";
 
 export const Home = () => {
-  const { showInstruction, setShowInstruction, buttonRef } =
+  const { showInstruction, setShowInstruction, buttonRef, instructionPanelRef } =
     useContext(SimulationContext);
-  const instructionRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
-        instructionRef.current &&
-        !instructionRef.current.contains(event.target)
+        instructionPanelRef.current &&
+        !instructionPanelRef.current.contains(event.target)
       ) {
         if (buttonRef.current && !buttonRef.current.contains(event.target)) {
           setShowInstruction(false); // close the panel
@@ -41,7 +40,7 @@ export const Home = () => {
         {/* Middle Container:- simulation area */}
         <div className={styles.middleContainer}>
           {showInstruction && (
-            <div ref={instructionRef} className={styles.instructionContainer}>
+            <div id="instructionPanel" ref={instructionPanelRef} className={styles.instructionContainer}>
               <Instruction />
             </div>
           )}

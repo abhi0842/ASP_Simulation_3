@@ -4,7 +4,7 @@ import { SimulationContext } from "../../context/SimulationContext.jsx";
 const TopPanel = () => {
   const { 
     showInstruction, setShowInstruction, buttonRef,
-    guideActive, setGuideActive
+    guideActive, setGuideActive, setStep
   } = useContext(SimulationContext);  
 
   const toggleInstruction = () => {
@@ -12,7 +12,15 @@ const TopPanel = () => {
   }
 
   const toggleGuide = () => {
-    setGuideActive(!guideActive);
+    if (!guideActive) {
+      // Just activate the guide at step 0 (Welcome)
+      setStep(0);
+      setGuideActive(true);
+    } else {
+      setGuideActive(false);
+      setShowInstruction(false);
+      setStep(0);
+    }
   }
 
   return (
@@ -23,21 +31,21 @@ const TopPanel = () => {
         </h1>
         <div className={styles.buttonContainer}>
           <button
-            id="guideButton"
-            className={styles.panelButton}
-            onClick={toggleGuide}
-            style={{ marginRight: '100px', backgroundColor: guideActive ? '#2ecc71' : '' }}
-          >
-            <span className={styles.buttonIcon}>🚀</span>
-            Guided Tutor
-          </button>
-          <button
             ref={buttonRef}
             className={styles.panelButton}
             onClick={toggleInstruction}
           >
             <span className={styles.buttonIcon}>ℹ️</span>
             Instruction
+          </button>
+          <button
+            id="guideButton"
+            className={styles.panelButton}
+            onClick={toggleGuide}
+            style={{ backgroundColor: guideActive ? '#2ecc71' : '' }}
+          >
+            <span className={styles.buttonIcon}>🚀</span>
+            Guided Tutor
           </button>
         </div>
       </div>
