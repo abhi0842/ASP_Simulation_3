@@ -6,6 +6,8 @@ import { SimulationContext } from "../../context/SimulationContext.jsx";
 import { LeftPanel } from "../../components/leftPanel/LeftPanel.jsx";
 import { RightPanel } from "../../components/rightPanel/RightPanel.jsx";
 import { GuidedModal } from "../../components/guidedModal/GuidedModal.jsx";
+import { DebugPanel } from "../../components/debugPanel/DebugPanel.jsx";
+import { StatusNotification } from "../../components/statusNotification/StatusNotification.jsx";
 
 export const Home = () => {
   const { showInstruction, setShowInstruction, buttonRef, instructionPanelRef } =
@@ -51,6 +53,8 @@ export const Home = () => {
           ©Copyright 2025 Virtual Labs, IIT Roorkee
         </div>
         <GuidedModal />
+        <DebugPanel />
+        <StatusNotification />
       </div>
     </div>
   );

@@ -55,11 +55,11 @@ export const RightPanel = () => {
 
           {!useSynthetic && (
             <>
-              <label>Select Dataset</label>
+              <label>Select ECG Dataset</label>
               <select value={csvFileName} onChange={(e) => setCsvFileName(e.target.value)}>
-                <option value="ecg100.csv">ecg100.csv</option>
-                <option value="ecg200.csv">ecg200.csv</option>
-                <option value="ecg300.csv">ecg300.csv</option>
+                <option value="ecg100.csv">ECG Dataset 2</option>
+                <option value="ecg200.csv">ECG Dataset 1</option>
+                <option value="ecg300.csv">ECG Dataset 3</option>
               </select>
             </>
           )}

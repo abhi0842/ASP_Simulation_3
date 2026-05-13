@@ -4,6 +4,7 @@ import Papa from "papaparse";
 import { generateStochasticSignal } from "../utils/filters";
 import { runLMS, runRLS, injectChangePoint } from "../adaptiveFilters";
 import { guideSteps } from "../guideSteps";
+import { normalizeECGData, createTimeSeriesSamples, validateECGSignal, extractECGFromCSV } from "../utils/csvParser";
 
 export const SimulationContext = createContext();
 
@@ -22,6 +23,18 @@ export const SimulationProvider = ({ children }) => {
   // Results from predictors
   const [lmsResult, setLmsResult] = useState(null);
   const [rlsResult, setRlsResult] = useState(null);
+  
+  // Multi-file signals storage
+  const [multiSignals, setMultiSignals] = useState({
+    ecg100: null,
+    ecg200: null,
+    ecg300: null,
+  });
+  const [multiResults, setMultiResults] = useState({
+    ecg100: { lms: null, rls: null },
+    ecg200: { lms: null, rls: null },
+    ecg300: { lms: null, rls: null },
+  });
 
   // Non-stationarity state
   const [changePoint, setChangePoint] = useState(1250); // index n*
@@ -62,7 +75,7 @@ export const SimulationProvider = ({ children }) => {
   const instructionPanelRef = useRef(null);
 
   // Dataset selection
-  const [csvFileName, setCsvFileName] = useState("ecg100.csv");
+  const [csvFileName, setCsvFileName] = useState("ecg200.csv");
   const [useSynthetic, setUseSynthetic] = useState(false);
 
   // --- Guided Mode State ---
@@ -101,29 +114,146 @@ export const SimulationProvider = ({ children }) => {
       const base = import.meta.env.BASE_URL || "/";
       const normalizedBase = base.endsWith("/") ? base : base + "/";
       const filePath = `${normalizedBase}${csvFileName}`;
+      console.log(`Loading ECG file from: ${filePath}`);
       
       Papa.parse(filePath, {
         download: true,
-        header: false,
+        header: true,
         dynamicTyping: true,
+        skipEmptyLines: true,
         complete: (results) => {
-          const data = results.data.flat().filter(v => typeof v === 'number');
-          // Map to time points based on duration and fs
-          const N = Math.min(data.length, Math.floor(time * originalFs));
-          const samples = data.slice(0, N).map((y, i) => ({
-            x: i / originalFs,
-            y: y
-          }));
-          setRawSamples(samples);
-          setCurrentSignal(samples.map(s => s.y));
-          resetSimulation(samples.length);
+          try {
+            // Check for Papa.parse errors
+            if (results.errors && results.errors.length > 0) {
+              console.warn("CSV parsing warnings:", results.errors);
+            }
+
+            // Extract ECG column from parsed results
+            const rawData = (results.data || [])
+              .map(row => {
+                // Try common ECG column names
+                return row.ECG_I || row['ECG_I'] || row.ECG || Object.values(row)[1];
+              })
+              .filter(v => typeof v === 'number' && !isNaN(v))
+              .map(v => parseFloat(v));
+            
+            if (rawData.length === 0) {
+              throw new Error("No ECG data found in CSV file. Expected column named 'ECG_I'");
+            }
+
+            const normalizedData = normalizeECGData(rawData);
+            
+            // Limit to specified duration
+            const N = Math.min(normalizedData.length, Math.floor(time * originalFs));
+            const limitedData = normalizedData.slice(0, N);
+            
+            // Create time series samples
+            const samples = createTimeSeriesSamples(limitedData, originalFs);
+            
+            // Validate signal
+            const validation = validateECGSignal(samples);
+            if (!validation.isValid) {
+              console.warn("⚠ ECG Signal Issues:", validation.issues);
+            }
+            console.log(`✓ Successfully loaded ${csvFileName}:`, validation.stats);
+
+            setRawSamples(samples);
+            setCurrentSignal(samples.map(s => s.y));
+            resetSimulation(samples.length);
+          } catch (err) {
+            console.error("❌ Error processing ECG CSV:", err.message);
+            console.error("Stack:", err);
+          }
         },
         error: (err) => {
-          console.error("Error loading CSV:", err);
+          console.error("Error loading CSV file:", err);
         }
       });
     }
   }, [useSynthetic, csvFileName, originalFs, time]);
+
+  const handleLoadAllECGs = useCallback(() => {
+    const base = import.meta.env.BASE_URL || "/";
+    const normalizedBase = base.endsWith("/") ? base : base + "/";
+    const fileNames = ["ecg100.csv", "ecg200.csv", "ecg300.csv"];
+    const loadedSignals = {};
+    let loadedCount = 0;
+
+    fileNames.forEach((fileName) => {
+      const filePath = `${normalizedBase}${fileName}`;
+      console.log(`Loading ${fileName} from: ${filePath}`);
+      Papa.parse(filePath, {
+        download: true,
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          try {
+            // Check for Papa.parse errors
+            if (results.errors && results.errors.length > 0) {
+              console.warn(`CSV parsing warnings for ${fileName}:`, results.errors);
+            }
+
+            // Extract ECG column from parsed results
+            const rawData = (results.data || [])
+              .map(row => {
+                // Try common ECG column names
+                return row.ECG_I || row['ECG_I'] || row.ECG || Object.values(row)[1];
+              })
+              .filter(v => typeof v === 'number' && !isNaN(v))
+              .map(v => parseFloat(v));
+            
+            if (rawData.length === 0) {
+              console.error(`❌ No numeric data found in ${fileName}`);
+              loadedCount++;
+              return;
+            }
+
+            const normalizedData = normalizeECGData(rawData);
+
+            if (normalizedData.length === 0) {
+              console.warn(`⚠ No valid data in ${fileName}`);
+              loadedCount++;
+              return;
+            }
+
+            // Limit to specified duration
+            const N = Math.min(normalizedData.length, Math.floor(time * originalFs));
+            const limitedData = normalizedData.slice(0, N);
+            
+            // Create time series samples
+            const samples = createTimeSeriesSamples(limitedData, originalFs);
+            
+            // Validate signal
+            const validation = validateECGSignal(samples);
+            console.log(`✓ Loaded ${fileName}:`, validation.stats);
+
+            const key = fileName.replace(".csv", "");
+            loadedSignals[key] = samples;
+            loadedCount++;
+
+            if (loadedCount === 3) {
+              setMultiSignals(loadedSignals);
+              // Set first one as current for display
+              if (loadedSignals.ecg100) {
+                setRawSamples(loadedSignals.ecg100);
+                setCurrentSignal(loadedSignals.ecg100.map(s => s.y));
+                resetSimulation(loadedSignals.ecg100.length);
+                console.log("✓ All ECG files loaded and ready!");
+              }
+            }
+          } catch (err) {
+            console.error(`❌ Error processing ${fileName}:`, err.message);
+            loadedCount++;
+          }
+        },
+        error: (err) => {
+          console.error(`❌ Error loading ${fileName}:`, err);
+          loadedCount++;
+        }
+      });
+    });
+  }, [originalFs, time]);
 
   const resetSimulation = (length) => {
     setFilteredECG(false);
@@ -198,6 +328,30 @@ export const SimulationProvider = ({ children }) => {
     markAction("RUN_SIMULATION");
   };
 
+  const handleRunLMSAllFiles = () => {
+    const newResults = { ...multiResults };
+    Object.keys(multiSignals).forEach((key) => {
+      if (multiSignals[key]) {
+        const signal = multiSignals[key].map(s => s.y);
+        const lmsRes = runLMS(signal, config.filterOrder, config.stepSize, config.windowLength, config.thresholdK);
+        newResults[key] = { ...newResults[key], lms: lmsRes };
+      }
+    });
+    setMultiResults(newResults);
+  };
+
+  const handleRunRLSAllFiles = () => {
+    const newResults = { ...multiResults };
+    Object.keys(multiSignals).forEach((key) => {
+      if (multiSignals[key]) {
+        const signal = multiSignals[key].map(s => s.y);
+        const rlsRes = runRLS(signal, config.filterOrder, config.forgettingFactor, config.regularization, config.windowLength, config.thresholdK);
+        newResults[key] = { ...newResults[key], rls: rlsRes };
+      }
+    });
+    setMultiResults(newResults);
+  };
+
   return (
     <SimulationContext.Provider
       value={{
@@ -218,6 +372,12 @@ export const SimulationProvider = ({ children }) => {
         rlsResult,
         handleRunLMS,
         handleRunRLS,
+
+        multiSignals,
+        multiResults,
+        handleLoadAllECGs,
+        handleRunLMSAllFiles,
+        handleRunRLSAllFiles,
 
         generateECG,
         setGenerateECG,
