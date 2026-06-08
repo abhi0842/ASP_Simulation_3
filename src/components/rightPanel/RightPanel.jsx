@@ -89,7 +89,7 @@ export const RightPanel = () => {
 
         {/* Card 3: Adaptive Filter */}
         <div id="filterParamsPanel" className={`${styles.box} ${isFaded("algorithmSelector") ? styles.faded : ""} ${isHighlighted("algorithmSelector") ? styles.highlight : ""}`}>
-          <h3>Adaptive Filter (NLMS / LMS / RLS)</h3>
+          <h3>Adaptive Filter (LMS / RLS)</h3>
           <label>Algorithm</label>
           <select 
             id="algorithmSelector"

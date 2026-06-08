@@ -41,13 +41,13 @@ This application is designed to **detect and analyze non-stationary changes in E
 
 ### **3. Filtered ECG Signal (Top-Right)**
 **Functionality:**
-- Displays output of **supervised adaptive filter** (NLMS, LMS, or RLS)
+- Displays output of **supervised adaptive filter** (LMS, or RLS)
 - Compares noisy signal to clean reference signal and learns to recover it
 - Shows **adaptive learning in action:**
   - Filter weights adapt to minimize MSE (Mean Squared Error)
   - Weights updated at each sample based on prediction error
 - Displays algorithm parameters in title:
-  - `NLMS — μ=0.05 — M=2` (step size and filter order)
+  - `LMS — μ=0.05 — M=2` (step size and filter order)
   - `RLS — λ=0.97 — M=2` (forgetting factor)
 
 **Non-Stationary Relevance:** ⭐⭐⭐ **MODERATELY RELEVANT**
