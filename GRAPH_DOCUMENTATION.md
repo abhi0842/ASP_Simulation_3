@@ -14,7 +14,7 @@ This application is designed to **detect and analyze non-stationary changes in E
 - Time-domain representation: X-axis = Time (seconds), Y-axis = Amplitude (mV)
 - Updates in real-time as you modify the signal duration slider
 
-**Non-Stationary Relevance:** ⭐⭐⭐⭐⭐ **HIGHLY RELEVANT**
+**Non-Stationary Relevance:** **HIGHLY RELEVANT**
 - **Baseline Segment (0-50% of signal):** Represents "normal" cardiac pattern - stationary behavior
 - **After Injection Point:** Shows visible shifts, distortions, or pattern changes when anomalies are injected
 - **Key Indicator:** If signal looks different before/after change-point, that's non-stationary behavior
@@ -31,7 +31,7 @@ This application is designed to **detect and analyze non-stationary changes in E
 - Shows how real-world ECG signals are corrupted
 - Only displays when you check at least one noise checkbox AND click "Add Noise to Signal"
 
-**Non-Stationary Relevance:** ⭐⭐⭐⭐ **VERY RELEVANT**
+**Non-Stationary Relevance:**  **VERY RELEVANT**
 - **Noise Characteristics Change:** Different noise sources dominate different time intervals
 - **Variance Non-Stationarity:** Noise power increases/decreases over time
 - **Pattern Masking:** Non-stationary changes in ECG can be hidden by noise
@@ -50,7 +50,7 @@ This application is designed to **detect and analyze non-stationary changes in E
   - `LMS — μ=0.05 — M=2` (step size and filter order)
   - `RLS — λ=0.97 — M=2` (forgetting factor)
 
-**Non-Stationary Relevance:** ⭐⭐⭐ **MODERATELY RELEVANT**
+**Non-Stationary Relevance:**  **MODERATELY RELEVANT**
 - **Supervised Mode:** Uses clean reference as target (assumes target is stationary)
 - **Adaptive Learning:** If signal becomes non-stationary, MSE will increase
 - **MSE Metric:** Shows how well filter is performing
@@ -96,7 +96,7 @@ This application is designed to **detect and analyze non-stationary changes in E
 - Multiple lines = multiple filter taps (w₀, w₁, ..., w_M)
 - Updated every 5 samples (sparse logging for performance)
 
-**Non-Stationary Relevance:** ⭐⭐⭐⭐ **VERY RELEVANT**
+**Non-Stationary Relevance:** **VERY RELEVANT**
 - **Stable Region:** Weights converge and stay constant
 - **After Non-Stationarity:** Weights suddenly change direction/magnitude
 - **Rapid Fluctuation:** Indicates filter struggling to adapt to new pattern
@@ -257,3 +257,31 @@ Signal characteristics change over time:
 | Graphs 6-7 (PSD) | Clear peaks at ECG frequencies | No clear structure (noise dominated) |
 | Graph 8 (Results) | Detection near injected point | No detection or far off |
 
+### . Weight Vector (w)
+The Weight Vector represents the internal coefficients or "taps" of the adaptive filter.
+
+- What it is: In this simulation, the filter acts as a predictor. It uses the weight vector to calculate the next sample: [ o bj ec tO bj ec t ] y ^ ​ [ n + 1 ] = w 0 ​ ⋅ x [ n ] + w 1 ​ ⋅ x [ n − 1 ] + … .
+- Relevance: It is essentially the "learned model" of the signal. If the signal is a steady heartbeat, the weights will settle into a stable pattern that captures that rhythm.
+- Student Learning: By observing the Weight Trajectory graph, students learn how the filter "tunes" itself. They see the weights move from zero to a stable state (convergence) and then "drift" to new values when the signal changes.
+### 2. RLS Matrix Trace (tr(P))
+The Trace is the sum of the diagonal elements of the [ o bj ec tO bj ec t ] P matrix (the inverse correlation matrix) used in the Recursive Least Squares (RLS) algorithm.
+
+- What it is: It acts as an Uncertainty Indicator .
+- Relevance: When the filter starts or when the signal suddenly changes, the trace value is high, meaning the algorithm is "uncertain" and searching for the right weights. As it learns the signal, the trace decreases, signifying high confidence.
+- Student Learning: Students learn that RLS tracks its own performance. A Peak Trace value at a specific sample often points directly to where the filter struggled most, usually right after a non-stationary change.
+### 3. Inject Change-point (n)*
+This is the "stress test" for the adaptive algorithms.
+
+- What it does: It introduces a Non-Stationarity into the signal at a specific sample index ( [ o bj ec tO bj ec t ] n ∗ ). The injectChangePoint function can inject:
+  - AR Parameter Shift: Changes the frequency content (spectral change).
+  - Variance Jump: Sudden increase in signal power/noise.
+  - Baseline Wander: A slow drift in the signal's mean.
+- Impact on the System:
+  - Error Power Spike: The Error Power graph will show a massive surge because the "old" weights can no longer predict the "new" signal.
+  - Saturation Effect: The simulation adds a brief flatline/saturation to mimic a physical sensor fault during the system shift.
+### Educational Takeaways
+From these tools, a student learns the core challenges of Adaptive Signal Processing:
+
+- Detection Lag: The time difference between when a change happens ( [ o bj ec tO bj ec t ] n ∗ ) and when the filter's error power crosses the Detection Threshold .
+- Adaptation Speed: Comparing how LMS (simple but slow) and RLS (complex but fast) react to the same injected change.
+- Algorithm Memory: How the Forgetting Factor (λ) affects the balance between tracking changes quickly and remaining stable during noise.
